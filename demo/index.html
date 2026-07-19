@@ -5,10 +5,6 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>音乐日记 · Demo</title>
   <link rel="stylesheet" href="styles.css" />
-  <script>
-    /** Next.js 后端地址，Demo 搜索 Spotify 时请求此 API */
-    window.MUSIC_API_BASE = "http://localhost:3000";
-  </script>
 </head>
 <body>
   <div id="app">
@@ -51,19 +47,40 @@
             <div class="vinyl-perspective">
               <div class="vinyl-tilt">
                 <div class="vinyl-glass-platter" aria-hidden="true"></div>
-                <div class="vinyl-disc" id="vinyl-disc">
+                <div class="vinyl-disc incoming" id="vinyl-disc-incoming" aria-hidden="true">
                   <div class="vinyl-edge vinyl-edge-1" aria-hidden="true"></div>
                   <div class="vinyl-edge vinyl-edge-2" aria-hidden="true"></div>
                   <div class="vinyl-edge vinyl-edge-3" aria-hidden="true"></div>
                   <div class="vinyl-edge vinyl-edge-4" aria-hidden="true"></div>
                   <div class="vinyl-edge vinyl-edge-5" aria-hidden="true"></div>
+                  <div class="vinyl-edge vinyl-edge-6" aria-hidden="true"></div>
+                  <div class="vinyl-edge vinyl-edge-7" aria-hidden="true"></div>
                   <div class="vinyl-surface">
                     <div class="vinyl-base" aria-hidden="true"></div>
                     <div class="vinyl-micro-grooves" aria-hidden="true"></div>
                     <div class="vinyl-grooves"></div>
                     <div class="vinyl-dead-wax" aria-hidden="true"></div>
                     <div class="vinyl-grain" aria-hidden="true"></div>
-                    <div class="vinyl-lighting" aria-hidden="true"></div>
+                    <div class="vinyl-label vinyl-label-blank" aria-hidden="true"></div>
+                    <div class="vinyl-label-rim" aria-hidden="true"></div>
+                    <div class="vinyl-spindle" aria-hidden="true"></div>
+                    <div class="vinyl-hole"></div>
+                  </div>
+                </div>
+                <div class="vinyl-disc" id="vinyl-disc">
+                  <div class="vinyl-edge vinyl-edge-1" aria-hidden="true"></div>
+                  <div class="vinyl-edge vinyl-edge-2" aria-hidden="true"></div>
+                  <div class="vinyl-edge vinyl-edge-3" aria-hidden="true"></div>
+                  <div class="vinyl-edge vinyl-edge-4" aria-hidden="true"></div>
+                  <div class="vinyl-edge vinyl-edge-5" aria-hidden="true"></div>
+                  <div class="vinyl-edge vinyl-edge-6" aria-hidden="true"></div>
+                  <div class="vinyl-edge vinyl-edge-7" aria-hidden="true"></div>
+                  <div class="vinyl-surface">
+                    <div class="vinyl-base" aria-hidden="true"></div>
+                    <div class="vinyl-micro-grooves" aria-hidden="true"></div>
+                    <div class="vinyl-grooves"></div>
+                    <div class="vinyl-dead-wax" aria-hidden="true"></div>
+                    <div class="vinyl-grain" aria-hidden="true"></div>
                     <div class="vinyl-label" id="vinyl-label">
                       <img id="cover-img" alt="" hidden />
                       <span id="cover-fallback" hidden></span>
@@ -71,9 +88,12 @@
                     <div class="vinyl-label-rim" aria-hidden="true"></div>
                     <div class="vinyl-spindle" aria-hidden="true"></div>
                     <div class="vinyl-hole"></div>
-                    <div class="vinyl-specular" aria-hidden="true"></div>
-                    <div class="vinyl-bevel" aria-hidden="true"></div>
                   </div>
+                </div>
+                <div class="vinyl-lightpass" aria-hidden="true">
+                  <div class="vinyl-lighting"></div>
+                  <div class="vinyl-specular"></div>
+                  <div class="vinyl-bevel"></div>
                 </div>
               </div>
             </div>

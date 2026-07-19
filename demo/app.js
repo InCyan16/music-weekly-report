@@ -60,8 +60,6 @@ let audioCtx = null;
 let oscillator = null;
 let gainNode = null;
 let tickInterval = null;
-let searchDebounce = null;
-let searchAbort = null;
 let lastSearchResults = [];
 let focusedResult = -1;
 
@@ -74,6 +72,7 @@ const els = {
   searchInput: $("#search-input"),
   searchResults: $("#search-results"),
   vinylDisc: $("#vinyl-disc"),
+  vinylDiscIncoming: $("#vinyl-disc-incoming"),
   vinylStage: $("#vinyl-stage"),
   tonearm: null,
   songTitle: $("#song-title"),
@@ -134,50 +133,21 @@ function showScreen(name) {
   if (name === "report") renderReport();
 }
 
-// ─── Search (Spotify via Next.js API) ───────────────────
-function mapSpotifyTrack(t) {
-  return {
-    id: t.externalId,
-    title: t.title,
-    artist: t.artist,
-    album: t.album || "",
-    durationMs: t.durationMs,
-    coverUrl: t.coverUrl,
-    color: "#d4843a",
-    source: "spotify",
-  };
+// ─── Search (local mock, no API) ─────────────────────────
+function searchMockTracks(q) {
+  const query = (q || "").trim().toLowerCase();
+  if (!query) return TRACKS.slice();
+  return TRACKS.filter(
+    (t) =>
+      t.title.toLowerCase().includes(query) ||
+      t.artist.toLowerCase().includes(query) ||
+      (t.album || "").toLowerCase().includes(query),
+  );
 }
 
 function handleSearch(q) {
-  clearTimeout(searchDebounce);
-  searchDebounce = setTimeout(async () => {
-    if (q.length < 2) {
-      els.searchResults.classList.add("hidden");
-      return;
-    }
-
-    searchAbort?.abort();
-    searchAbort = new AbortController();
-
-    const apiBase = window.MUSIC_API_BASE || "http://localhost:3000";
-    els.searchResults.innerHTML =
-      '<li style="padding:16px;text-align:center;color:#9a948c">搜索中...</li>';
-    els.searchResults.classList.remove("hidden");
-
-    try {
-      const res = await fetch(
-        `${apiBase}/api/music/search/public?q=${encodeURIComponent(q)}`,
-        { signal: searchAbort.signal },
-      );
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error || "搜索失败");
-      renderSearchResults((data.tracks || []).map(mapSpotifyTrack));
-    } catch (err) {
-      if (err.name === "AbortError") return;
-      els.searchResults.innerHTML = `<li style="padding:16px;text-align:center;color:#c45c4a;line-height:1.5">${err.message || "搜索失败"}<br><span style="font-size:12px;color:#9a948c">请确认 Next.js 已启动且 .env 已配置 Spotify 凭据</span></li>`;
-      els.searchResults.classList.remove("hidden");
-    }
-  }, 300);
+  focusedResult = -1;
+  renderSearchResults(searchMockTracks(q));
 }
 
 function renderSearchResults(tracks) {
@@ -190,7 +160,7 @@ function renderSearchResults(tracks) {
       .map(
         (t, i) => `
       <li data-id="${t.id}" class="${i === focusedResult ? "focused" : ""}">
-        <div class="result-cover">${t.coverUrl ? `<img src="${t.coverUrl}" alt="" />` : "♪"}</div>
+        <div class="result-cover" style="${t.coverUrl ? "" : `background:linear-gradient(135deg, ${t.color || "#d4843a"}, #2a2a2a)`}">${t.coverUrl ? `<img src="${t.coverUrl}" alt="" />` : "♪"}</div>
         <div class="result-info">
           <div class="result-title">${t.title}</div>
           <div class="result-artist">${t.artist}${t.album ? ` · ${t.album}` : ""}</div>
@@ -358,7 +328,47 @@ function goHistory(delta) {
   playTrack(item.track);
 }
 
-// ─── Vinyl gestures: rotate = seek, swipe = switch song ──
+// ─── Swap in a fresh blank record with a slide animation ──
+function swapToBlankRecord(direction) {
+  const disc = els.vinylDisc;
+  const incoming = els.vinylDiscIncoming;
+  if (!disc || !incoming || disc.classList.contains("swapping")) return;
+
+  endCurrentSession("changed_track");
+  pausePlayback();
+
+  const left = direction < 0;
+  const outClass = left ? "swap-out-left" : "swap-out-right";
+  const inClass = left ? "swap-in-right" : "swap-in-left";
+
+  disc.classList.remove("spinning", "manual-rotate");
+  disc.style.transform = "";
+  disc.classList.add("swapping", outClass);
+  incoming.classList.add("swap-active", inClass);
+
+  const cleanup = () => {
+    disc.classList.remove("swapping", outClass);
+    incoming.classList.remove("swap-active", inClass);
+
+    disc.style.transition = "none";
+    disc.style.transform = "";
+
+    state.currentTrack = null;
+    state.sessionId = null;
+    state.positionMs = 0;
+    state.accumulatedMs = 0;
+    state.qualified = false;
+    state.isScrubbing = false;
+    updateUI();
+
+    requestAnimationFrame(() => {
+      disc.style.transition = "";
+    });
+  };
+  disc.addEventListener("animationend", cleanup, { once: true });
+}
+
+// ─── Vinyl gestures: rotate = seek, swipe = swap record ──
 function setupVinylGestures() {
   let startX = 0;
   let startY = 0;
@@ -402,9 +412,8 @@ function setupVinylGestures() {
     const dist = Math.hypot(dx, dy);
 
     if (!gestureMode && dist > 8) {
-      const currentAngle = angleAt(x, y);
-      const angleDelta = Math.abs(normalizeAngle(currentAngle - startAngle));
-      gestureMode = angleDelta > Math.abs(dx) * 0.4 ? "rotate" : "swipe";
+      // 横向位移明显大于纵向 => 切歌；否则按转盘处理（拨动=定位）
+      gestureMode = Math.abs(dx) > Math.abs(dy) * 1.4 ? "swipe" : "rotate";
     }
 
     if (gestureMode === "rotate") {
@@ -435,8 +444,8 @@ function setupVinylGestures() {
 
     if (mode === "swipe") {
       const diff = x - startX;
-      if (diff < -80) goHistory(1);
-      else if (diff > 80) goHistory(-1);
+      if (diff < -80) swapToBlankRecord(-1);
+      else if (diff > 80) swapToBlankRecord(1);
     } else if (mode === "rotate") {
       els.vinylStage.classList.remove("scrubbing");
       els.vinylDisc.classList.remove("manual-rotate");
@@ -548,6 +557,7 @@ function updateUI() {
     els.coverImg.hidden = true;
     els.coverFallback.hidden = true;
   }
+  els.vinylDisc.classList.toggle("empty", !state.currentTrack);
   updateVinylRotation();
   updatePlayCount();
   updateWeekDots();
@@ -756,6 +766,7 @@ function roundRect(ctx, x, y, w, h, r) {
 // ─── Events ──────────────────────────────────────────────
 function bindEvents() {
   els.searchInput.addEventListener("input", (e) => handleSearch(e.target.value));
+  els.searchInput.addEventListener("focus", (e) => handleSearch(e.target.value));
   els.searchInput.addEventListener("keydown", (e) => {
     const items = els.searchResults.querySelectorAll("li[data-id]");
     if (e.key === "ArrowDown") {
