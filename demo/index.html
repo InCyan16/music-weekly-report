@@ -1,0 +1,146 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>音乐日记 · Demo</title>
+  <link rel="stylesheet" href="styles.css" />
+  <script>
+    /** Next.js 后端地址，Demo 搜索 Spotify 时请求此 API */
+    window.MUSIC_API_BASE = "http://localhost:3000";
+  </script>
+</head>
+<body>
+  <div id="app">
+    <!-- Screen: Today / Player -->
+    <section id="screen-today" class="screen active">
+      <div class="today-top">
+        <header class="top-bar">
+          <button class="nav-btn" data-go="report" title="周报">📊</button>
+          <p class="date-label" id="today-date"></p>
+          <button class="nav-btn" data-go="mood" title="心情" hidden id="mood-shortcut">😊</button>
+        </header>
+
+        <div class="today-heading">
+        <h1 class="main-question">你今天喜欢听什么音乐？</h1>
+
+        <div class="search-wrap">
+          <div class="search-glass">
+            <input
+              id="search-input"
+              type="text"
+              placeholder=""
+              autocomplete="off"
+              minlength="2"
+            />
+            <span class="search-icon">🔍</span>
+          </div>
+          <ul id="search-results" class="search-results hidden"></ul>
+        </div>
+        </div>
+      </div>
+
+      <div class="player-main">
+        <div class="now-playing" id="now-playing">
+          <p class="song-title" id="song-title"></p>
+          <p class="song-artist" id="song-artist"></p>
+        </div>
+
+        <div class="player-zone" id="player-zone">
+          <div class="vinyl-stage" id="vinyl-stage">
+            <div class="vinyl-perspective">
+              <div class="vinyl-tilt">
+                <div class="vinyl-glass-platter" aria-hidden="true"></div>
+                <div class="vinyl-disc" id="vinyl-disc">
+                  <div class="vinyl-edge vinyl-edge-1" aria-hidden="true"></div>
+                  <div class="vinyl-edge vinyl-edge-2" aria-hidden="true"></div>
+                  <div class="vinyl-edge vinyl-edge-3" aria-hidden="true"></div>
+                  <div class="vinyl-edge vinyl-edge-4" aria-hidden="true"></div>
+                  <div class="vinyl-edge vinyl-edge-5" aria-hidden="true"></div>
+                  <div class="vinyl-surface">
+                    <div class="vinyl-base" aria-hidden="true"></div>
+                    <div class="vinyl-micro-grooves" aria-hidden="true"></div>
+                    <div class="vinyl-grooves"></div>
+                    <div class="vinyl-dead-wax" aria-hidden="true"></div>
+                    <div class="vinyl-grain" aria-hidden="true"></div>
+                    <div class="vinyl-lighting" aria-hidden="true"></div>
+                    <div class="vinyl-label" id="vinyl-label">
+                      <img id="cover-img" alt="" hidden />
+                      <span id="cover-fallback" hidden></span>
+                    </div>
+                    <div class="vinyl-label-rim" aria-hidden="true"></div>
+                    <div class="vinyl-spindle" aria-hidden="true"></div>
+                    <div class="vinyl-hole"></div>
+                    <div class="vinyl-specular" aria-hidden="true"></div>
+                    <div class="vinyl-bevel" aria-hidden="true"></div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="player-foot">
+        <div class="bottom-actions">
+          <button id="btn-next-song" class="pill-btn">下一首歌</button>
+          <button id="btn-finish" class="pill-btn primary">就这样吧</button>
+          <button id="btn-mood-jump" class="pill-btn" type="button">心情 · 临时</button>
+        </div>
+
+        <div class="week-dots" id="week-dots" aria-label="本周聆听记录"></div>
+
+        <p class="play-count" id="play-count"></p>
+      </div>
+    </section>
+
+    <!-- Screen: Mood -->
+    <section id="screen-mood" class="screen mood-screen">
+      <h1 class="mood-title">你今天听音乐的心情如何？</h1>
+      <div class="mood-screen-body">
+        <div class="mood-row" id="mood-row" role="radiogroup" aria-label="心情选择"></div>
+      </div>
+      <button id="btn-mood-done" class="pill-btn primary mood-done-btn" disabled>完成</button>
+    </section>
+
+    <!-- Screen: Report -->
+    <section id="screen-report" class="screen">
+      <button class="back-btn" data-go="today">← 返回聆听</button>
+      <h1 class="main-question report-title">本周音乐周报</h1>
+      <p class="week-range" id="week-range"></p>
+
+      <div class="report-layout">
+        <div class="report-vinyls" id="report-vinyls"></div>
+        <div class="turntable-img">
+          <div class="turntable-body">
+            <div class="tt-platter"></div>
+            <div class="tt-arm"></div>
+            <div class="tt-lid"></div>
+          </div>
+        </div>
+        <div class="mood-stats" id="mood-stats"></div>
+      </div>
+
+      <div class="top5-list" id="top5-list"></div>
+      <button id="btn-share" class="pill-btn primary wide">保存分享图</button>
+    </section>
+
+    <!-- Confirm modal -->
+    <div id="modal" class="modal hidden">
+      <div class="modal-card">
+        <p id="modal-text"></p>
+        <div class="modal-actions">
+          <button id="modal-cancel" class="pill-btn">继续听</button>
+          <button id="modal-confirm" class="pill-btn primary">记录心情</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Demo badge -->
+    <div class="demo-badge">Demo Mode · 本地可运行</div>
+  </div>
+
+  <canvas id="share-canvas" hidden></canvas>
+  <script src="app.js"></script>
+</body>
+</html>
