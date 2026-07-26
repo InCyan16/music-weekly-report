@@ -9,7 +9,7 @@ const TRACKS = [
   { id: "3", title: "Rainy Sunday", artist: "Lo-Fi Collective", album: "Calm Days", durationMs: 240000, color: "#6a9e72" },
   { id: "4", title: "City Lights", artist: "Urban Echo", album: "Neon", durationMs: 210000, color: "#c45c4a" },
   { id: "5", title: "Soft Landing", artist: "Ambient Works", album: "Drift", durationMs: 320000, color: "#8b7ec8" },
-  { id: "6", title: "晨间咖啡", artist: "林一", album: "日常", durationMs: 195000, color: "#d4b83a" },
+  { id: "6", title: "Morning Coffee", artist: "Lin Yi", album: "Everyday", durationMs: 195000, color: "#d4b83a" },
 ];
 
 const TWEMOJI_CDN =
@@ -28,11 +28,11 @@ function twemojiUrl(label) {
 }
 
 const MOODS = [
-  { label: "very_happy", score: 5, emoji: "😄", text: "非常开心" },
-  { label: "happy", score: 4, emoji: "😊", text: "开心" },
-  { label: "calm", score: 3, emoji: "😌", text: "平静" },
-  { label: "low", score: 2, emoji: "😔", text: "低落" },
-  { label: "sad", score: 1, emoji: "😢", text: "难过" },
+  { label: "very_happy", score: 5, emoji: "😄", text: "Very happy" },
+  { label: "happy", score: 4, emoji: "😊", text: "Happy" },
+  { label: "calm", score: 3, emoji: "😌", text: "Calm" },
+  { label: "low", score: 2, emoji: "😔", text: "Low" },
+  { label: "sad", score: 1, emoji: "😢", text: "Sad" },
 ];
 
 const VALID_THRESHOLD_MS = 30000;
@@ -74,14 +74,13 @@ const els = {
   vinylDisc: $("#vinyl-disc"),
   vinylDiscIncoming: $("#vinyl-disc-incoming"),
   vinylStage: $("#vinyl-stage"),
-  tonearm: null,
+  tonearm: $("#tonearm"),
   songTitle: $("#song-title"),
   songArtist: $("#song-artist"),
   coverImg: $("#cover-img"),
   coverFallback: $("#cover-fallback"),
   btnNextSong: $("#btn-next-song"),
   btnFinish: $("#btn-finish"),
-  btnMoodJump: $("#btn-mood-jump"),
   playCount: $("#play-count"),
   weekDots: $("#week-dots"),
   moodRow: $("#mood-row"),
@@ -99,7 +98,7 @@ const els = {
 
 // ─── Init ────────────────────────────────────────────────
 function init() {
-  els.todayDate.textContent = new Date().toLocaleDateString("zh-CN", {
+  els.todayDate.textContent = new Date().toLocaleDateString("en-US", {
     year: "numeric", month: "long", day: "numeric", weekday: "long",
   });
 
@@ -167,7 +166,7 @@ function renderSearchResults(tracks) {
   lastSearchResults = tracks;
   if (!tracks.length) {
     els.searchResults.innerHTML =
-      '<li style="padding:16px;text-align:center;color:#9a948c">没有找到相关歌曲</li>';
+      '<li style="padding:16px;text-align:center;color:#9a948c">No songs found</li>';
   } else {
     els.searchResults.innerHTML = tracks
       .map(
@@ -229,6 +228,7 @@ function startPlayback() {
   startTick();
   els.vinylDisc.classList.add("spinning");
   els.vinylDisc.style.transform = "";
+  updateTonearm();
 }
 
 function pausePlayback() {
@@ -243,7 +243,13 @@ function pausePlayback() {
   els.vinylDisc.style.transform = state.currentTrack
     ? `rotate(${(state.positionMs / state.currentTrack.durationMs) * 360}deg)`
     : "";
+  updateTonearm();
   checkQualify();
+}
+
+function updateTonearm() {
+  if (!els.tonearm) return;
+  els.tonearm.classList.toggle("on-record", !!(state.currentTrack && state.isPlaying));
 }
 
 function startAudio() {
@@ -491,10 +497,8 @@ function setupVinylGestures() {
       els.vinylDisc.classList.remove("manual-rotate");
       state.isScrubbing = false;
       updateVinylRotation();
-    } else if (state.currentTrack) {
-      if (state.isPlaying) pausePlayback();
-      else startPlayback();
     }
+    // Single click: do nothing (play/pause is double-click)
 
     gestureMode = null;
   };
@@ -507,6 +511,13 @@ function setupVinylGestures() {
     if (active) onMove(e.clientX, e.clientY);
   });
   window.addEventListener("mouseup", (e) => onEnd(e.clientX));
+
+  els.vinylStage.addEventListener("dblclick", (e) => {
+    e.preventDefault();
+    if (!state.currentTrack) return;
+    if (state.isPlaying) pausePlayback();
+    else startPlayback();
+  });
 
   els.vinylStage.addEventListener(
     "touchstart",
@@ -599,6 +610,7 @@ function updateUI() {
   }
   els.vinylDisc.classList.toggle("empty", !state.currentTrack);
   updateVinylRotation();
+  updateTonearm();
   updatePlayCount();
   updateWeekDots();
 }
@@ -609,7 +621,7 @@ function updatePlayCount() {
     (p) => new Date(p.listenedAt).toDateString() === today,
   );
   els.playCount.textContent = todayPlays.length
-    ? `今日有效播放 ${todayPlays.length} 次`
+    ? `${todayPlays.length} valid play${todayPlays.length === 1 ? "" : "s"} today`
     : "";
 }
 
@@ -690,27 +702,27 @@ function renderReport() {
           <div class="label" style="background:${item.track.color}">${item.track.title.slice(0, 2)}</div>
         </div>
         <p>${item.track.title}</p>
-        <p>${item.count} 次</p>
+        <p>${item.count}×</p>
       </div>`;
     })
     .join("");
 
   if (!top5.length) {
-    els.reportVinyls.innerHTML = '<p style="text-align:center;color:#9a948c;width:100%;padding-top:40px">还没有播放记录，先去听几首歌吧</p>';
+    els.reportVinyls.innerHTML = '<p style="text-align:center;color:#9a948c;width:100%;padding-top:40px">No plays yet — go listen to a few songs</p>';
   }
 
   const moodText = state.mood
     ? MOODS.find((m) => m.label === state.mood.label)?.text || ""
-    : "未记录";
+    : "Not logged";
   const uniqueDays = new Set(
     state.validPlays.map((p) => new Date(p.listenedAt).toDateString()),
   ).size;
 
   els.moodStats.innerHTML = `
-    <div class="stat-pill">总播放 ${state.validPlays.length} 次</div>
-    <div class="stat-pill">听音 ${uniqueDays} 天</div>
-    <div class="stat-pill">心情 ${moodText}</div>
-    <div class="stat-pill">歌曲 ${new Set(state.validPlays.map((p) => p.trackId)).size} 首</div>
+    <div class="stat-pill">${state.validPlays.length} total plays</div>
+    <div class="stat-pill">${uniqueDays} listening days</div>
+    <div class="stat-pill">Mood ${moodText}</div>
+    <div class="stat-pill">${new Set(state.validPlays.map((p) => p.trackId)).size} songs</div>
   `;
 
   els.top5List.innerHTML = top5.length
@@ -723,11 +735,11 @@ function renderReport() {
           <div class="top5-title">${item.track.title}</div>
           <div class="top5-artist">${item.track.artist}</div>
         </div>
-        <span class="top5-count">${item.count} 次</span>
+        <span class="top5-count">${item.count}×</span>
       </div>`,
         )
         .join("")
-    : '<p style="color:#9a948c;font-size:14px">暂无数据</p>';
+    : '<p style="color:#9a948c;font-size:14px">No data yet</p>';
 }
 
 // ─── Share image ─────────────────────────────────────────
@@ -743,7 +755,7 @@ function generateShareImage() {
   ctx.fillStyle = "#2a2a2a";
   ctx.font = "bold 56px Georgia, serif";
   ctx.textAlign = "center";
-  ctx.fillText("音乐日记", 540, 100);
+  ctx.fillText("Music Diary", 540, 100);
   ctx.font = "28px sans-serif";
   ctx.fillStyle = "#6b6560";
   ctx.fillText(els.weekRange.textContent, 540, 150);
@@ -758,7 +770,7 @@ function generateShareImage() {
     ctx.fillText(`#1 ${top5[0].track.title}`, 540, 290);
     ctx.font = "28px sans-serif";
     ctx.fillStyle = "rgba(255,255,255,0.7)";
-    ctx.fillText(`${top5[0].track.artist} · ${top5[0].count} 次`, 540, 340);
+    ctx.fillText(`${top5[0].track.artist} · ${top5[0].count}×`, 540, 340);
   }
 
   let y = 460;
@@ -774,14 +786,14 @@ function generateShareImage() {
     ctx.fillText(`${i + 1}. ${item.track.title}`, 80, y);
     ctx.fillStyle = "#9a948c";
     ctx.textAlign = "right";
-    ctx.fillText(`${item.count} 次`, 1000, y);
+    ctx.fillText(`${item.count}×`, 1000, y);
     ctx.textAlign = "left";
   });
 
   ctx.fillStyle = "#9a948c";
   ctx.font = "22px sans-serif";
   ctx.textAlign = "center";
-  ctx.fillText(`总播放 ${state.validPlays.length} 次 · music-diary demo`, 540, 1280);
+  ctx.fillText(`${state.validPlays.length} total plays · music-diary demo`, 540, 1280);
 
   const link = document.createElement("a");
   link.download = `music-weekly-report-${new Date().toISOString().slice(0, 10)}.png`;
@@ -805,8 +817,23 @@ function roundRect(ctx, x, y, w, h, r) {
 
 // ─── Events ──────────────────────────────────────────────
 function bindEvents() {
+  const openSearch = () => {
+    els.searchInput.focus();
+    handleSearch(els.searchInput.value);
+  };
+
   els.searchInput.addEventListener("input", (e) => handleSearch(e.target.value));
   els.searchInput.addEventListener("focus", (e) => handleSearch(e.target.value));
+  // Click anywhere on the search chrome opens the mock dropdown
+  const searchGlass = document.querySelector(".search-glass");
+  if (searchGlass) {
+    searchGlass.addEventListener("mousedown", (e) => {
+      if (e.target === els.searchInput) return;
+      e.preventDefault();
+      openSearch();
+    });
+  }
+
   els.searchInput.addEventListener("keydown", (e) => {
     const items = els.searchResults.querySelectorAll("li[data-id]");
     if (e.key === "ArrowDown") {
@@ -826,7 +853,7 @@ function bindEvents() {
     }
   });
 
-  document.addEventListener("click", (e) => {
+  document.addEventListener("mousedown", (e) => {
     if (!e.target.closest(".search-wrap")) {
       els.searchResults.classList.add("hidden");
     }
@@ -834,16 +861,14 @@ function bindEvents() {
 
   els.btnNextSong.addEventListener("click", () => goNextSongLikeSwipe());
 
-  // 选完歌后点「就这样吧」→ 直接进入心情页
+  // After picking a song, "That's it" goes straight to the mood screen
   els.btnFinish.addEventListener("click", () => {
     if (!state.currentTrack && state.history.length === 0) {
-      alert("先选一首歌吧。");
+      alert("Pick a song first.");
       return;
     }
     goToMoodScreen();
   });
-
-  els.btnMoodJump.addEventListener("click", () => goToMoodScreen());
 
   els.modalCancel.addEventListener("click", () => els.modal.classList.add("hidden"));
   els.modalConfirm.addEventListener("click", () => {
