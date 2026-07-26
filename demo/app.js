@@ -130,7 +130,20 @@ function saveState() {
 function showScreen(name) {
   $$(".screen").forEach((s) => s.classList.remove("active"));
   $(`#screen-${name}`).classList.add("active");
+  if (name === "mood") renderMoodPicker();
   if (name === "report") renderReport();
+}
+
+/** 与向右拖唱片相同：有下一首则前进，否则滑出空唱片 */
+function goNextSongLikeSwipe() {
+  if (!state.currentTrack) return;
+  if (canGoHistory(1)) goHistory(1, { animate: true });
+  else swapToBlankRecord(1);
+}
+
+function goToMoodScreen() {
+  pausePlayback();
+  showScreen("mood");
 }
 
 // ─── Search (local mock, no API) ─────────────────────────
@@ -183,22 +196,30 @@ function renderSearchResults(tracks) {
 }
 
 // ─── Playback ────────────────────────────────────────────
-function playTrack(track) {
+function playTrack(track, { appendHistory = true } = {}) {
   endCurrentSession("changed_track");
   state.currentTrack = track;
   state.sessionId = crypto.randomUUID();
   state.positionMs = 0;
   state.accumulatedMs = 0;
   state.qualified = false;
-  state.history.push({
-    sessionId: state.sessionId,
-    track,
-    startedAt: new Date().toISOString(),
-    qualified: false,
-  });
-  state.historyIndex = state.history.length - 1;
+  if (appendHistory) {
+    state.history.push({
+      sessionId: state.sessionId,
+      track,
+      startedAt: new Date().toISOString(),
+      qualified: false,
+    });
+    state.historyIndex = state.history.length - 1;
+  }
   startPlayback();
   updateUI();
+}
+
+function canGoHistory(delta) {
+  if (!state.currentTrack) return false;
+  const newIndex = state.historyIndex + delta;
+  return newIndex >= 0 && newIndex < state.history.length;
 }
 
 function startPlayback() {
@@ -320,19 +341,29 @@ function endCurrentSession(reason) {
   state.sessionId = null;
 }
 
-function goHistory(delta) {
+function goHistory(delta, { animate = false } = {}) {
+  if (!canGoHistory(delta)) return false;
   const newIndex = state.historyIndex + delta;
-  if (newIndex < 0 || newIndex >= state.history.length) return;
-  state.historyIndex = newIndex;
   const item = state.history[newIndex];
-  playTrack(item.track);
+
+  const apply = () => {
+    state.historyIndex = newIndex;
+    playTrack(item.track, { appendHistory: false });
+  };
+
+  if (!animate) {
+    apply();
+    return true;
+  }
+
+  animateDiscSwap(delta < 0 ? -1 : 1, apply);
+  return true;
 }
 
-// ─── Swap in a fresh blank record with a slide animation ──
-function swapToBlankRecord(direction) {
+function animateDiscSwap(direction, onDone) {
   const disc = els.vinylDisc;
   const incoming = els.vinylDiscIncoming;
-  if (!disc || !incoming || disc.classList.contains("swapping")) return;
+  if (!disc || !incoming || disc.classList.contains("swapping")) return false;
 
   endCurrentSession("changed_track");
   pausePlayback();
@@ -349,23 +380,28 @@ function swapToBlankRecord(direction) {
   const cleanup = () => {
     disc.classList.remove("swapping", outClass);
     incoming.classList.remove("swap-active", inClass);
-
     disc.style.transition = "none";
     disc.style.transform = "";
-
-    state.currentTrack = null;
-    state.sessionId = null;
-    state.positionMs = 0;
-    state.accumulatedMs = 0;
-    state.qualified = false;
     state.isScrubbing = false;
-    updateUI();
-
+    onDone();
     requestAnimationFrame(() => {
       disc.style.transition = "";
     });
   };
   disc.addEventListener("animationend", cleanup, { once: true });
+  return true;
+}
+
+// ─── Swap in a fresh blank record with a slide animation ──
+function swapToBlankRecord(direction) {
+  animateDiscSwap(direction, () => {
+    state.currentTrack = null;
+    state.sessionId = null;
+    state.positionMs = 0;
+    state.accumulatedMs = 0;
+    state.qualified = false;
+    updateUI();
+  });
 }
 
 // ─── Vinyl gestures: rotate = seek, swipe = swap record ──
@@ -444,8 +480,12 @@ function setupVinylGestures() {
 
     if (mode === "swipe") {
       const diff = x - startX;
-      if (diff < -80) swapToBlankRecord(-1);
-      else if (diff > 80) swapToBlankRecord(1);
+      // 向左拖：回到上一首（需已搜歌且有历史）；无上一首时不响应
+      if (diff < -80) {
+        if (canGoHistory(-1)) goHistory(-1, { animate: true });
+      } else if (diff > 80) {
+        goNextSongLikeSwipe();
+      }
     } else if (mode === "rotate") {
       els.vinylStage.classList.remove("scrubbing");
       els.vinylDisc.classList.remove("manual-rotate");
@@ -792,31 +832,23 @@ function bindEvents() {
     }
   });
 
-  els.btnNextSong.addEventListener("click", () => goHistory(1));
+  els.btnNextSong.addEventListener("click", () => goNextSongLikeSwipe());
 
+  // 选完歌后点「就这样吧」→ 直接进入心情页
   els.btnFinish.addEventListener("click", () => {
-    const today = new Date().toDateString();
-    const count = state.validPlays.filter(
-      (p) => new Date(p.listenedAt).toDateString() === today,
-    ).length;
-    if (count === 0) {
-      alert("先完整听一会儿音乐，再记录今天的心情吧。");
+    if (!state.currentTrack && state.history.length === 0) {
+      alert("先选一首歌吧。");
       return;
     }
-    pausePlayback();
-    els.modalText.textContent = `今天你听了 ${count} 次音乐，准备记录此刻的心情吗？`;
-    els.modal.classList.remove("hidden");
+    goToMoodScreen();
   });
 
-  els.btnMoodJump.addEventListener("click", () => {
-    renderMoodPicker();
-    showScreen("mood");
-  });
+  els.btnMoodJump.addEventListener("click", () => goToMoodScreen());
 
   els.modalCancel.addEventListener("click", () => els.modal.classList.add("hidden"));
   els.modalConfirm.addEventListener("click", () => {
     els.modal.classList.add("hidden");
-    showScreen("mood");
+    goToMoodScreen();
   });
 
   els.btnMoodDone.addEventListener("click", () => {

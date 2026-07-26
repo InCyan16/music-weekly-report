@@ -3,15 +3,15 @@
 :root {
   --paper: #f4efe6;
   --paper-dark: #e5ddd2;
-  --ink: #2a2a2a;
-  --ink-muted: #6b6560;
-  --ink-light: #9a948c;
+  --ink: #f2ebe3;
+  --ink-muted: #b8aea3;
+  --ink-light: #8a8178;
   --vinyl: #141414;
   --accent: #d4843a;
   --accent-warm: #e8a84c;
-  --glass: rgba(255, 255, 255, 0.55);
-  --glass-border: rgba(255, 255, 255, 0.7);
-  --shadow: 0 8px 32px rgba(0, 0, 0, 0.12);
+  --glass: rgba(255, 255, 255, 0.1);
+  --glass-border: rgba(255, 255, 255, 0.22);
+  --shadow: 0 12px 40px rgba(0, 0, 0, 0.45);
   --scene-ratio: 0.72;
   --layout-top: 188px;
   --layout-bottom: 108px;
@@ -31,11 +31,42 @@
 
 body {
   font-family: -apple-system, "PingFang SC", "Helvetica Neue", sans-serif;
-  background: var(--paper);
   color: var(--ink);
   min-height: 100vh;
   overflow-x: hidden;
-  background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.035'/%3E%3C/svg%3E");
+  /* 暗室：深底 + 细噪点 */
+  background-color: #0c0b0a;
+  background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.04'/%3E%3C/svg%3E");
+  background-size: 200px 200px;
+}
+
+/* 射灯光束：自上方打在唱片区 */
+body::before {
+  content: "";
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  z-index: 0;
+  background:
+    radial-gradient(
+      ellipse 42% 38% at 50% 48%,
+      rgba(255, 236, 210, 0.22) 0%,
+      rgba(255, 220, 180, 0.1) 28%,
+      rgba(255, 200, 140, 0.03) 52%,
+      transparent 72%
+    ),
+    radial-gradient(
+      ellipse 18% 55% at 50% 0%,
+      rgba(255, 240, 220, 0.18) 0%,
+      rgba(255, 220, 180, 0.06) 40%,
+      transparent 75%
+    ),
+    radial-gradient(
+      ellipse 90% 80% at 50% 50%,
+      #1a1714 0%,
+      #0c0b0a 55%,
+      #070605 100%
+    );
 }
 
 #app {
@@ -43,6 +74,7 @@ body {
   margin: 0 auto;
   min-height: 100vh;
   position: relative;
+  z-index: 1;
   padding: 0 32px;
 }
 
@@ -108,6 +140,7 @@ body {
   margin: 0 0 12px;
   line-height: 1.15;
   letter-spacing: -0.02em;
+  text-shadow: 0 2px 24px rgba(255, 220, 180, 0.18);
 }
 
 /* Glass search */
@@ -292,50 +325,50 @@ body {
   transform: rotateX(60deg);
 }
 
-.vinyl-glass-platter {
+/* 哑光橡胶唱机垫（slipmat）：圆形、颗粒、同心环 */
+.vinyl-slipmat {
   position: absolute;
   left: 50%;
   top: 50%;
-  width: calc(var(--vinyl-size) * 1.22);
-  height: calc(var(--vinyl-size) * 1.22);
-  margin-left: calc(var(--vinyl-size) * -0.61);
-  margin-top: calc(var(--vinyl-size) * -0.61);
-  transform: translateZ(-64px);
+  width: calc(var(--vinyl-size) * 1.14);
+  height: calc(var(--vinyl-size) * 1.14);
+  margin-left: calc(var(--vinyl-size) * -0.57);
+  margin-top: calc(var(--vinyl-size) * -0.57);
+  /* 垫层略低于薄唱片底面（厚度约 16px） */
+  transform: translateZ(-26px);
   transform-style: preserve-3d;
   pointer-events: none;
+  border-radius: 50%;
 }
 
-.vinyl-glass-platter::before {
+.vinyl-slipmat::before {
   content: "";
   position: absolute;
   inset: 0;
-  background: linear-gradient(
-    168deg,
-    rgba(255, 255, 255, 0.52) 0%,
-    rgba(255, 255, 255, 0.28) 38%,
-    rgba(255, 255, 255, 0.1) 72%,
-    rgba(255, 255, 255, 0.04) 100%
-  );
-  border: 1.5px solid rgba(255, 255, 255, 0.5);
-  border-top-color: rgba(255, 255, 255, 0.88);
-  border-bottom-color: rgba(255, 255, 255, 0.22);
-  backdrop-filter: blur(10px);
-  -webkit-backdrop-filter: blur(10px);
+  border-radius: 50%;
+  background-image:
+    url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='1.2' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.45'/%3E%3C/svg%3E"),
+    radial-gradient(circle at 50% 50%, transparent 14%, rgba(0, 0, 0, 0.35) 15%, transparent 15.6%),
+    repeating-radial-gradient(
+      circle at 50% 50%,
+      rgba(255, 255, 255, 0.035) 0px,
+      rgba(255, 255, 255, 0.035) 1px,
+      transparent 1px,
+      transparent 5px
+    ),
+    radial-gradient(
+      circle at 42% 36%,
+      #3a3a3a 0%,
+      #242424 42%,
+      #161616 72%,
+      #0c0c0c 100%
+    );
+  background-size: 64px 64px, auto, auto, auto;
   box-shadow:
-    inset 0 3px 8px rgba(255, 255, 255, 0.72),
-    inset 0 -3px 10px rgba(0, 0, 0, 0.07);
-}
-
-.vinyl-glass-platter::after {
-  content: "";
-  position: absolute;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  height: 4px;
-  transform: rotateX(-90deg);
-  transform-origin: bottom center;
-  background: linear-gradient(180deg, rgba(255, 255, 255, 0.38), rgba(255, 255, 255, 0.14));
+    0 18px 40px rgba(0, 0, 0, 0.55),
+    0 4px 12px rgba(0, 0, 0, 0.4),
+    inset 0 1px 1px rgba(255, 255, 255, 0.07),
+    inset 0 -2px 6px rgba(0, 0, 0, 0.45);
 }
 
 .vinyl-disc {
@@ -384,27 +417,104 @@ body {
   z-index: 6;
 }
 
+/* 侧面厚度：更薄（约 16px），外缘高光白圈强化立体感 */
 .vinyl-edge {
   position: absolute;
-  inset: 0;
+  inset: -1.75px;
   border-radius: 50%;
   pointer-events: none;
-  background: linear-gradient(
-    180deg,
-    #2b2b2b 0%,
-    #1c1c1c 30%,
-    #0f0f0f 60%,
-    #060606 100%
-  );
 }
 
-.vinyl-edge-1 { transform: translateZ(-8px); filter: brightness(0.95); }
-.vinyl-edge-2 { transform: translateZ(-16px); filter: brightness(0.85); }
-.vinyl-edge-3 { transform: translateZ(-24px); filter: brightness(0.72); }
-.vinyl-edge-4 { transform: translateZ(-32px); filter: brightness(0.6); }
-.vinyl-edge-5 { transform: translateZ(-40px); filter: brightness(0.48); }
-.vinyl-edge-6 { transform: translateZ(-48px); filter: brightness(0.38); }
-.vinyl-edge-7 { transform: translateZ(-56px); filter: brightness(0.28); }
+.vinyl-edge-1 {
+  transform: translateZ(-1.8px);
+  background: radial-gradient(
+    circle at 50% 50%,
+    rgb(42, 42, 42) 0%,
+    rgb(28, 28, 28) 96.2%,
+    rgba(228, 228, 224, 0.55) 98.6%,
+    rgba(248, 248, 245, 0.72) 100%
+  );
+}
+.vinyl-edge-2 {
+  transform: translateZ(-3.6px);
+  background: radial-gradient(
+    circle at 50% 50%,
+    rgb(38, 38, 38) 0%,
+    rgb(24, 24, 24) 96.2%,
+    rgba(228, 228, 224, 0.52) 98.6%,
+    rgba(248, 248, 245, 0.7) 100%
+  );
+}
+.vinyl-edge-3 {
+  transform: translateZ(-5.3px);
+  background: radial-gradient(
+    circle at 50% 50%,
+    rgb(34, 34, 34) 0%,
+    rgb(20, 20, 20) 96.2%,
+    rgba(228, 228, 224, 0.48) 98.6%,
+    rgba(248, 248, 245, 0.66) 100%
+  );
+}
+.vinyl-edge-4 {
+  transform: translateZ(-7.1px);
+  background: radial-gradient(
+    circle at 50% 50%,
+    rgb(30, 30, 30) 0%,
+    rgb(16, 16, 16) 96.2%,
+    rgba(228, 228, 224, 0.45) 98.6%,
+    rgba(248, 248, 245, 0.63) 100%
+  );
+}
+.vinyl-edge-5 {
+  transform: translateZ(-8.9px);
+  background: radial-gradient(
+    circle at 50% 50%,
+    rgb(26, 26, 26) 0%,
+    rgb(12, 12, 12) 96.2%,
+    rgba(228, 228, 224, 0.42) 98.6%,
+    rgba(248, 248, 245, 0.6) 100%
+  );
+}
+.vinyl-edge-6 {
+  transform: translateZ(-10.7px);
+  background: radial-gradient(
+    circle at 50% 50%,
+    rgb(22, 22, 22) 0%,
+    rgb(10, 10, 10) 96.2%,
+    rgba(228, 228, 224, 0.38) 98.6%,
+    rgba(248, 248, 245, 0.56) 100%
+  );
+}
+.vinyl-edge-7 {
+  transform: translateZ(-12.4px);
+  background: radial-gradient(
+    circle at 50% 50%,
+    rgb(18, 18, 18) 0%,
+    rgb(8, 8, 8) 96.2%,
+    rgba(228, 228, 224, 0.35) 98.6%,
+    rgba(248, 248, 245, 0.52) 100%
+  );
+}
+.vinyl-edge-8 {
+  transform: translateZ(-14.2px);
+  background: radial-gradient(
+    circle at 50% 50%,
+    rgb(15, 15, 15) 0%,
+    rgb(6, 6, 6) 96.2%,
+    rgba(228, 228, 224, 0.32) 98.6%,
+    rgba(248, 248, 245, 0.5) 100%
+  );
+}
+.vinyl-edge-9 {
+  transform: translateZ(-16px);
+  background: radial-gradient(
+    circle at 50% 50%,
+    rgb(12, 12, 12) 0%,
+    rgb(4, 4, 4) 96.2%,
+    rgba(228, 228, 224, 0.3) 98.6%,
+    rgba(248, 248, 245, 0.48) 100%
+  );
+}
 
 .vinyl-surface {
   position: absolute;
@@ -447,6 +557,19 @@ body {
     rgba(0, 0, 0, 0.18) 98%,
     rgba(35, 35, 35, 0.45) 100%
   );
+}
+
+/* 正面外缘：细白圈标出厚度分界 + 反射感 */
+.vinyl-rim {
+  position: absolute;
+  inset: 0;
+  border-radius: 50%;
+  pointer-events: none;
+  box-shadow:
+    inset 0 0 0 1.25px rgba(245, 245, 242, 0.42),
+    inset 0 0 0 2.75px rgba(18, 18, 18, 0.92),
+    inset 0 0 0 3.5px rgba(255, 255, 255, 0.06);
+  z-index: 5;
 }
 
 .vinyl-grain {
@@ -635,8 +758,8 @@ body {
 }
 
 .bottom-actions .pill-btn:hover {
-  background: rgba(255, 255, 255, 0.72);
-  border-color: rgba(255, 255, 255, 0.85);
+  background: rgba(255, 255, 255, 0.18);
+  border-color: rgba(255, 255, 255, 0.35);
   color: var(--ink);
 }
 
@@ -665,7 +788,7 @@ body {
   color: var(--ink);
 }
 
-.pill-btn:hover { background: var(--ink); color: white; }
+.pill-btn:hover { background: var(--ink); color: #0c0b0a; }
 .pill-btn.primary { background: var(--accent); border-color: var(--accent); color: white; }
 .pill-btn.primary:hover { background: #b86a28; border-color: #b86a28; }
 .pill-btn:disabled { opacity: 0.4; cursor: default; }

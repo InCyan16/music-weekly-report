@@ -7,7 +7,9 @@ import { calcSceneHeight, calcSceneWidth } from "@/lib/ui/vinyl-layout";
 
 /** 60° — 接近平视 */
 const VINYL_TILT_DEG = 60;
-const VINYL_EDGE_DEPTH = 7;
+/** 侧边厚度（px），倾斜后可见立体感 */
+const VINYL_EDGE_DEPTH = 16;
+const VINYL_EDGE_LAYERS = 9;
 
 const VINYL_NOISE = `url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.95' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.55'/%3E%3C/svg%3E")`;
 
@@ -83,6 +85,18 @@ function DiscSurface({
             rgba(0,0,0,0.18) 98%,
             rgba(35,35,35,0.45) 100%
           )`,
+        }}
+      />
+
+      {/* 正面外缘：细白圈标出厚度分界 */}
+      <div
+        className="pointer-events-none absolute inset-0 rounded-full"
+        style={{
+          boxShadow: `
+            inset 0 0 0 1.25px rgba(245,245,242,0.42),
+            inset 0 0 0 2.75px rgba(18,18,18,0.92),
+            inset 0 0 0 3.5px rgba(255,255,255,0.06)
+          `,
         }}
       />
 
@@ -182,20 +196,34 @@ function DiscSurface({
 }
 
 function VinylEdge({ depth }: { depth: number }) {
-  const layers = 5;
+  const layers = VINYL_EDGE_LAYERS;
   return (
     <>
       {Array.from({ length: layers }, (_, i) => {
-        const z = ((i + 1) / layers) * depth;
-        const shade = 28 - i * 4;
+        const t = (i + 1) / layers;
+        const z = t * depth;
+        // 越深越暗，模拟侧面受光衰减
+        const shade = Math.round(46 - t * 34);
+        const dark = Math.max(shade - 14, 4);
+        const rimAlpha = 0.58 - t * 0.28;
         return (
           <div
-            key={z}
-            className="absolute inset-0 rounded-full"
+            key={i}
+            className="absolute rounded-full"
             aria-hidden
             style={{
+              // 略大于盘面，让白色外圈从侧面露出来
+              inset: -1.75,
               transform: `translateZ(-${z}px)`,
-              background: `linear-gradient(180deg, rgb(${shade},${shade},${shade}) 0%, rgb(${Math.max(shade - 12, 4)},${Math.max(shade - 12, 4)},${Math.max(shade - 12, 4)}) 100%)`,
+              background: `
+                radial-gradient(
+                  circle at 50% 50%,
+                  rgb(${shade},${shade},${shade}) 0%,
+                  rgb(${dark},${dark},${dark}) 96.2%,
+                  rgba(228,228,224,${rimAlpha}) 98.6%,
+                  rgba(248,248,245,${Math.min(rimAlpha + 0.18, 0.75)}) 100%
+                )
+              `,
             }}
           />
         );
