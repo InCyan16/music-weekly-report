@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
+import Image from "next/image";
 import { VinylRecord } from "./VinylRecord";
 import { type Track } from "@/lib/music/types";
 
@@ -153,7 +154,9 @@ export function Turntable({
         aria-label={
           track ? (isPlaying ? "暂停" : "播放") : undefined
         }
-        className="relative mx-auto flex cursor-grab justify-center active:cursor-grabbing"
+        className={`turntable-stage relative mx-auto flex cursor-grab justify-center active:cursor-grabbing ${
+          track ? "has-track" : ""
+        } ${isPlaying && !isLoading ? "is-playing" : ""}`}
         style={{
           width: stageWidth,
           height: stageHeight,
@@ -197,6 +200,27 @@ export function Turntable({
           rotationDeg={isScrubbing ? scrubRotation : playbackRotation}
           isScrubbing={isScrubbing}
         />
+
+        <div className="turntable-tonearm" aria-hidden>
+          <Image
+            className="turntable-tonearm-base-asset"
+            src="/turntable/tonearm-base-cropped.png"
+            alt=""
+            width={895}
+            height={1019}
+            draggable={false}
+          />
+          <div className="turntable-tonearm-pivot">
+            <Image
+              className="turntable-tonearm-arm-asset"
+              src="/turntable/tonearm-arm-cropped.png"
+              alt=""
+              width={622}
+              height={1328}
+              draggable={false}
+            />
+          </div>
+        </div>
       </div>
 
       {track && (

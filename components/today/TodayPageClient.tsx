@@ -105,7 +105,7 @@ export function TodayPageClient() {
   }
 
   return (
-    <main className="flex h-dvh max-h-dvh w-full flex-col overflow-hidden px-8 py-4">
+    <main className="turntable-page flex h-dvh max-h-dvh w-full flex-col overflow-hidden px-8 py-4">
       <header className="mb-0 shrink-0">
         <div className="flex items-center justify-between">
           <p className="text-sm text-ink-muted">{today}</p>
@@ -164,13 +164,13 @@ export function TodayPageClient() {
         <div className="flex flex-wrap items-center justify-center gap-3">
           <button
             onClick={handleEndDay}
-            className="rounded-full border-2 border-ink px-6 py-2 text-sm font-medium transition-colors hover:bg-ink hover:text-white"
+            className="rounded-full border border-white/20 bg-white/[0.055] px-6 py-2 text-sm font-medium text-white shadow-[inset_0_1px_0_rgba(255,255,255,0.1),0_10px_28px_rgba(0,0,0,0.18)] backdrop-blur-xl transition-colors hover:bg-white/10"
           >
             结束今天的聆听
           </button>
           <button
             onClick={() => router.push("/today/mood")}
-            className="rounded-full border border-white/70 bg-white/55 px-5 py-2 text-sm font-medium backdrop-blur-xl transition-colors hover:bg-white/70"
+            className="rounded-full border border-[#da8f4f]/45 bg-[#b86f35]/20 px-5 py-2 text-sm font-medium text-white shadow-[inset_0_1px_0_rgba(255,220,184,0.12),0_10px_28px_rgba(0,0,0,0.18)] backdrop-blur-xl transition-colors hover:bg-[#b86f35]/30"
           >
             心情 · 临时
           </button>

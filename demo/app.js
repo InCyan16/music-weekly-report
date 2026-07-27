@@ -249,7 +249,11 @@ function pausePlayback() {
 
 function updateTonearm() {
   if (!els.tonearm) return;
-  els.tonearm.classList.toggle("on-record", !!(state.currentTrack && state.isPlaying));
+  const hasTrack = !!state.currentTrack;
+  const isActive = !!(state.currentTrack && state.isPlaying);
+  els.tonearm.classList.toggle("on-record", isActive);
+  els.vinylStage?.classList.toggle("has-track", hasTrack);
+  els.vinylStage?.classList.toggle("is-playing", isActive);
 }
 
 function startAudio() {

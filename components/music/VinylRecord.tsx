@@ -5,8 +5,8 @@ import Image from "next/image";
 import { cn } from "@/lib/utils";
 import { calcSceneHeight, calcSceneWidth } from "@/lib/ui/vinyl-layout";
 
-/** 60° — 接近平视 */
-const VINYL_TILT_DEG = 60;
+/** 轻微透视：保留唱盘的实体厚度，同时更接近硬件俯视视角 */
+const VINYL_TILT_DEG = 56;
 /** 侧边厚度（px），倾斜后可见立体感 */
 const VINYL_EDGE_DEPTH = 16;
 const VINYL_EDGE_LAYERS = 9;
@@ -35,7 +35,7 @@ function DiscSurface({
   coverUrl?: string | null;
   title?: string;
 }) {
-  const labelSize = size * 0.35;
+  const labelSize = size * 0.3;
   const holeSize = size * 0.06;
   const holeRing = size * 0.085;
 
@@ -45,20 +45,23 @@ function DiscSurface({
         className="absolute inset-0 rounded-full"
         style={{
           background: `
-            radial-gradient(circle at 50% 50%, #1e1e1e 0%, #121212 55%, #0a0a0a 100%)
+            radial-gradient(circle at 50% 50%, transparent 0 18%, rgba(0,0,0,0.16) 18.5% 20%, transparent 20.5%),
+            radial-gradient(circle at 38% 30%, #242424 0%, #151515 38%, #0a0a0a 76%, #050505 100%)
           `,
         }}
       />
 
       <div
-        className="absolute inset-0 rounded-full opacity-35 mix-blend-overlay"
+        className="absolute inset-0 rounded-full opacity-[0.68] mix-blend-soft-light"
         style={{
           background: `repeating-radial-gradient(
             circle at 50% 50%,
             transparent 0px,
-            transparent 0.7px,
-            rgba(255,255,255,0.05) 0.7px,
-            rgba(0,0,0,0.07) 1.4px
+            transparent 0.55px,
+            rgba(255,255,255,0.12) 0.7px,
+            rgba(0,0,0,0.2) 1.25px,
+            transparent 1.45px,
+            transparent 2.2px
           )`,
         }}
       />
@@ -74,6 +77,24 @@ function DiscSurface({
           }}
         />
       ))}
+
+      <div
+        className="pointer-events-none absolute inset-[6.8%] rounded-full opacity-[0.34] mix-blend-screen"
+        style={{
+          background:
+            "radial-gradient(circle, transparent 0 27%, rgba(255,255,255,0.038) 27.3% 27.7%, transparent 28% 42%, rgba(255,255,255,0.03) 42.3% 42.6%, transparent 42.9% 61%, rgba(255,255,255,0.032) 61.3% 61.7%, transparent 62% 77%, rgba(255,255,255,0.026) 77.2% 77.6%, transparent 78%)",
+        }}
+      />
+
+      <div
+        className="pointer-events-none absolute inset-0 rounded-full opacity-[0.16] mix-blend-overlay"
+        style={{
+          background: `
+            repeating-conic-gradient(from 17deg, rgba(255,255,255,0.05) 0deg 0.12deg, transparent 0.12deg 7deg),
+            conic-gradient(from 210deg, transparent 0deg 28deg, rgba(255,255,255,0.09) 47deg, transparent 74deg 184deg, rgba(255,255,255,0.035) 222deg, transparent 258deg 360deg)
+          `,
+        }}
+      />
 
       <div
         className="pointer-events-none absolute inset-0 rounded-full"
@@ -101,18 +122,8 @@ function DiscSurface({
       />
 
       <div
-        className="pointer-events-none absolute inset-0 rounded-full opacity-[0.15] mix-blend-soft-light"
-        style={{ backgroundImage: VINYL_NOISE, backgroundSize: "96px 96px" }}
-      />
-
-      <div
-        className="pointer-events-none absolute inset-0 rounded-full"
-        style={{
-          background: `
-            radial-gradient(ellipse 55% 45% at 32% 26%, rgba(255,248,235,0.2) 0%, transparent 52%),
-            radial-gradient(ellipse 40% 35% at 72% 78%, rgba(0,0,0,0.24) 0%, transparent 48%)
-          `,
-        }}
+        className="pointer-events-none absolute inset-0 rounded-full opacity-10 mix-blend-soft-light"
+        style={{ backgroundImage: VINYL_NOISE, backgroundSize: "72px 72px" }}
       />
 
       <div
@@ -120,8 +131,9 @@ function DiscSurface({
         style={{
           width: labelSize,
           height: labelSize,
+          filter: "saturate(0.72) brightness(0.86)",
           boxShadow:
-            "inset 0 2px 8px rgba(0,0,0,0.35), inset 0 -1px 3px rgba(255,255,255,0.07)",
+            "inset 0 2px 8px rgba(0,0,0,0.44), inset 0 -1px 2px rgba(255,255,255,0.06), 0 0 0 1px rgba(0,0,0,0.34)",
         }}
       >
         {coverUrl ? (
@@ -173,14 +185,6 @@ function DiscSurface({
           background:
             "radial-gradient(circle at 40% 35%, #3a3a3a 0%, #1a1a1a 55%, #080808 100%)",
           boxShadow: "inset 0 2px 5px rgba(0,0,0,0.8)",
-        }}
-      />
-
-      <div
-        className="pointer-events-none absolute inset-0 rounded-full"
-        style={{
-          background:
-            "radial-gradient(ellipse 28% 12% at 36% 24%, rgba(255,255,255,0.22) 0%, transparent 100%)",
         }}
       />
 
@@ -253,21 +257,13 @@ function GlassPlatter({ size, depth }: { size: number; depth: number }) {
         className="absolute inset-0"
         style={{
           background: `
-            linear-gradient(
-              168deg,
-              rgba(255, 255, 255, 0.52) 0%,
-              rgba(255, 255, 255, 0.28) 38%,
-              rgba(255, 255, 255, 0.1) 72%,
-              rgba(255, 255, 255, 0.04) 100%
-            )
+            radial-gradient(circle at 34% 28%, rgba(255,255,255,0.07) 0%, transparent 34%),
+            repeating-radial-gradient(circle at 50% 50%, rgba(255,255,255,0.025) 0 1px, transparent 1px 4px),
+            radial-gradient(circle at 44% 36%, #343434 0%, #1c1c1c 48%, #090909 100%)
           `,
-          border: "1.5px solid rgba(255, 255, 255, 0.5)",
-          borderTopColor: "rgba(255, 255, 255, 0.88)",
-          borderBottomColor: "rgba(255, 255, 255, 0.22)",
-          backdropFilter: "blur(10px)",
-          WebkitBackdropFilter: "blur(10px)",
+          border: "1px solid rgba(255,255,255,0.09)",
           boxShadow:
-            "inset 0 3px 8px rgba(255, 255, 255, 0.72), inset 0 -3px 10px rgba(0, 0, 0, 0.07)",
+            "0 28px 56px rgba(0,0,0,0.58), 0 8px 18px rgba(0,0,0,0.42), inset 0 1px 1px rgba(255,255,255,0.06), inset 0 0 0 2px rgba(0,0,0,0.34)",
         }}
       />
       <div
@@ -278,7 +274,7 @@ function GlassPlatter({ size, depth }: { size: number; depth: number }) {
           transform: "rotateX(-90deg)",
           transformOrigin: "bottom center",
           background:
-            "linear-gradient(180deg, rgba(255,255,255,0.38), rgba(255,255,255,0.14))",
+            "linear-gradient(180deg, #2d2d2d, #0c0c0c)",
         }}
       />
     </div>
@@ -331,9 +327,29 @@ export function VinylRecord({
     </motion.div>
   );
 
+  const environmentLight = (
+    <div
+      className={cn(
+        "vinyl-environment-light pointer-events-none absolute inset-0 overflow-hidden rounded-full",
+        useSpinAnimation && "is-active",
+      )}
+      aria-hidden
+      style={{ transform: "translateZ(1px)" }}
+    >
+      <div className="vinyl-environment-base absolute inset-0 rounded-full" />
+      <div className="vinyl-reflection-wide absolute rounded-full" />
+      <div className="vinyl-reflection-fine absolute rounded-full" />
+      <div className="vinyl-environment-bevel absolute inset-0 rounded-full" />
+    </div>
+  );
+
   return (
     <motion.div
-      className={cn("relative", onClick ? "cursor-pointer" : "cursor-grab", className)}
+      className={cn(
+        "relative drop-shadow-[0_26px_38px_rgba(0,0,0,0.44)]",
+        onClick ? "cursor-pointer" : "cursor-grab",
+        className,
+      )}
       style={{ width: sceneWidth, height: sceneHeight }}
       onClick={onClick}
       whileHover={onClick ? { scale: 1.02 } : undefined}
@@ -360,10 +376,14 @@ export function VinylRecord({
           >
             <GlassPlatter size={size} depth={VINYL_EDGE_DEPTH} />
             {spinningDisc}
+            {environmentLight}
           </div>
         </div>
       ) : (
-        <div className="relative h-full w-full">{spinningDisc}</div>
+        <div className="relative h-full w-full">
+          {spinningDisc}
+          {environmentLight}
+        </div>
       )}
 
       {rank && (
