@@ -41,7 +41,7 @@ export const sessionQualifySchema = sessionProgressSchema.extend({
 
 export const moodSchema = z.object({
   moodScore: z.number().int().min(1).max(5),
-  moodLabel: z.enum(["very_happy", "happy", "calm", "low", "sad"]),
+  moodLabel: z.enum(["loved", "happy", "calm", "tired", "sad"]),
 });
 
 export type TrackInput = z.infer<typeof trackSchema>;

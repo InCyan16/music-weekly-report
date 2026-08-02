@@ -10,11 +10,13 @@ import { formatWeekRange } from "@/lib/dates/week";
 import { cn } from "@/lib/utils";
 
 const MOOD_TEXT: Record<string, string> = {
-  very_happy: "非常开心",
-  happy: "开心",
-  calm: "平静",
-  low: "低落",
-  sad: "难过",
+  loved: "Loved",
+  happy: "Happy",
+  calm: "Calm",
+  tired: "Tired",
+  sad: "Sad",
+  very_happy: "Loved",
+  low: "Tired",
 };
 
 export function WeeklyReportView({ weekId }: { weekId: string }) {

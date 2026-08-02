@@ -42,10 +42,10 @@ export type MusicPlaybackProvider = {
 };
 
 export type MoodLabel =
-  | "very_happy"
+  | "loved"
   | "happy"
   | "calm"
-  | "low"
+  | "tired"
   | "sad";
 
 export const MOOD_OPTIONS: {
@@ -53,13 +53,35 @@ export const MOOD_OPTIONS: {
   score: number;
   emoji: string;
   text: string;
+  color: string;
 }[] = [
-  { label: "very_happy", score: 5, emoji: "😄", text: "非常开心" },
-  { label: "happy", score: 4, emoji: "😊", text: "开心" },
-  { label: "calm", score: 3, emoji: "😌", text: "平静" },
-  { label: "low", score: 2, emoji: "😔", text: "低落" },
-  { label: "sad", score: 1, emoji: "😢", text: "难过" },
+  { label: "happy", score: 4, emoji: "😊", text: "Happy", color: "#e8c84a" },
+  { label: "loved", score: 5, emoji: "😍", text: "Loved", color: "#e891b0" },
+  { label: "calm", score: 3, emoji: "😌", text: "Calm", color: "#9ec5d6" },
+  { label: "tired", score: 2, emoji: "😫", text: "Tired", color: "#c9b896" },
+  { label: "sad", score: 1, emoji: "😢", text: "Sad", color: "#9b8ec4" },
 ];
+
+/** Majority mood from filled slots; ties → last inserted. */
+export function primaryMoodFromSlots(slots: MoodLabel[]): {
+  label: MoodLabel;
+  score: number;
+} | null {
+  if (!slots.length) return null;
+  const counts = new Map<MoodLabel, number>();
+  for (const s of slots) counts.set(s, (counts.get(s) || 0) + 1);
+  let best = slots[slots.length - 1];
+  let bestCount = 0;
+  for (const s of slots) {
+    const c = counts.get(s) || 0;
+    if (c >= bestCount) {
+      best = s;
+      bestCount = c;
+    }
+  }
+  const opt = MOOD_OPTIONS.find((m) => m.label === best)!;
+  return { label: best, score: opt.score };
+}
 
 export type TopSong = {
   rank: number;

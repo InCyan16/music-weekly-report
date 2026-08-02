@@ -1,134 +1,364 @@
 "use client";
 
-import { useState } from "react";
+import { useCallback, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
-import { motion, useReducedMotion } from "framer-motion";
-import { MOOD_OPTIONS, type MoodLabel } from "@/lib/music/types";
-import { cn } from "@/lib/utils";
+import {
+  MOOD_OPTIONS,
+  primaryMoodFromSlots,
+  type MoodLabel,
+} from "@/lib/music/types";
 import { MoodEmoji } from "@/components/mood/MoodEmoji";
+import { cn } from "@/lib/utils";
+import "./mood-box.css";
+
+const SLOT_MAX = 5;
+const SLOT_SPREADS = [-28, -14, 0, 14, 28];
+const SLOT_TILTS = [-18, -8, 4, -6, 12];
+
+function MiniVinyl({
+  label,
+  text,
+  size,
+}: {
+  label: MoodLabel;
+  text?: string;
+  size?: "box" | "ghost";
+}) {
+  const mood = MOOD_OPTIONS.find((m) => m.label === label)!;
+  return (
+    <div
+      className={cn(
+        "mood-mini-vinyl",
+        size === "box" && "mood-mini-vinyl--box",
+        size === "ghost" && "mood-mini-vinyl--ghost",
+      )}
+    >
+      <div className="mood-mini-disc">
+        <div className="mood-mini-sheen" aria-hidden />
+        <div className="mood-mini-grooves" aria-hidden />
+        <div
+          className="mood-mini-label"
+          style={{ background: mood.color }}
+        >
+          <MoodEmoji label={label} />
+        </div>
+        <div className="mood-mini-hole" aria-hidden />
+      </div>
+      {text ? <span className="mood-mini-text">{text}</span> : null}
+    </div>
+  );
+}
 
 export function MoodPicker() {
-  const [selected, setSelected] = useState<MoodLabel | null>(null);
+  const [slots, setSlots] = useState<MoodLabel[]>([]);
+  const [phase, setPhase] = useState<"picking" | "complete">("picking");
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
+  const [lidClose, setLidClose] = useState(0);
+  const [lidDragging, setLidDragging] = useState(false);
+  const [ghostLabel, setGhostLabel] = useState<MoodLabel | null>(null);
   const router = useRouter();
-  const reduceMotion = useReducedMotion();
+  const boxRef = useRef<HTMLDivElement>(null);
+  const ghostRef = useRef<HTMLDivElement>(null);
+  const dragLabel = useRef<MoodLabel | null>(null);
+  const dragMoved = useRef(false);
+  const lidCloseRef = useRef(0);
+  const lidDrag = useRef<{ startY: number; active: boolean }>({
+    startY: 0,
+    active: false,
+  });
 
-  async function handleSave() {
-    if (!selected) return;
-    const mood = MOOD_OPTIONS.find((m) => m.label === selected)!;
+  const full = slots.length >= SLOT_MAX;
+
+  const addSlot = useCallback((label: MoodLabel) => {
+    setSlots((prev) => (prev.length >= SLOT_MAX ? prev : [...prev, label]));
+  }, []);
+
+  const goNext = () => {
+    const now = new Date();
+    if (now.getDay() === 0) router.push("/reports");
+    else router.push("/week");
+  };
+
+  async function handleContinue() {
+    const primary = primaryMoodFromSlots(slots);
+    if (!primary) {
+      goNext();
+      return;
+    }
     setSaving(true);
     setError("");
-
     try {
       const res = await fetch("/api/mood", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          moodScore: mood.score,
-          moodLabel: mood.label,
+          moodScore: primary.score,
+          moodLabel: primary.label,
         }),
       });
-
       if (!res.ok) throw new Error("保存失败");
-
-      const now = new Date();
-      const isSunday = now.getDay() === 0;
-      if (isSunday) {
-        router.push("/reports");
-      } else {
-        router.push("/week");
-      }
+      goNext();
     } catch {
       setError("保存心情失败，请重试");
       setSaving(false);
     }
   }
 
-  return (
-    <div className="flex h-full w-full flex-col items-center justify-between py-[8vh]">
-      <motion.h1
-        className="font-display shrink-0 text-center text-[clamp(1.75rem,4.5dvh,2.75rem)] font-extrabold leading-[1.15] tracking-tight"
-        initial={reduceMotion ? false : { opacity: 0, y: -12 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.45, ease: "easeOut" }}
-      >
-        你今天听音乐的心情如何？
-      </motion.h1>
+  function onPointerDownItem(label: MoodLabel, e: React.PointerEvent) {
+    if (phase !== "picking" || full) return;
+    e.preventDefault();
+    (e.currentTarget as HTMLElement).setPointerCapture?.(e.pointerId);
+    dragLabel.current = label;
+    dragMoved.current = false;
+    setGhostLabel(label);
+    if (ghostRef.current) {
+      ghostRef.current.style.left = `${e.clientX}px`;
+      ghostRef.current.style.top = `${e.clientY}px`;
+    }
+  }
 
-      <div
-        className="flex flex-1 items-center justify-center"
-        role="radiogroup"
-        aria-label="心情选择"
-      >
-        <div className="flex flex-nowrap items-center justify-center gap-[10px]">
-          {MOOD_OPTIONS.map((mood, index) => {
-            const isSelected = selected === mood.label;
-            return (
-              <motion.button
+  function onPointerMove(e: React.PointerEvent | PointerEvent) {
+    if (!dragLabel.current) {
+      if (lidDrag.current.active) {
+        const delta = Math.max(0, e.clientY - lidDrag.current.startY);
+        const next = Math.min(delta / 120, 1);
+        lidCloseRef.current = next;
+        setLidClose(next);
+      }
+      return;
+    }
+    if (Math.hypot(e.movementX, e.movementY) > 0) dragMoved.current = true;
+    if (ghostRef.current) {
+      ghostRef.current.style.left = `${e.clientX}px`;
+      ghostRef.current.style.top = `${e.clientY}px`;
+    }
+  }
+
+  function onPointerUp(e: React.PointerEvent | PointerEvent) {
+    if (lidDrag.current.active) {
+      lidDrag.current.active = false;
+      setLidDragging(false);
+      const progress = Math.max(
+        lidCloseRef.current,
+        (e.clientY - lidDrag.current.startY) / 120,
+      );
+      if (progress > 0.4) {
+        setPhase("complete");
+        lidCloseRef.current = 1;
+        setLidClose(1);
+      } else {
+        lidCloseRef.current = 0;
+        setLidClose(0);
+      }
+      return;
+    }
+
+    const label = dragLabel.current;
+    if (!label) return;
+    dragLabel.current = null;
+    setGhostLabel(null);
+    const box = boxRef.current?.getBoundingClientRect();
+    const hit =
+      !!box &&
+      e.clientX >= box.left &&
+      e.clientX <= box.right &&
+      e.clientY >= box.top &&
+      e.clientY <= box.bottom;
+    if (hit || !dragMoved.current) addSlot(label);
+    dragMoved.current = false;
+  }
+
+  const dateLabel = new Date().toLocaleDateString("en-US", {
+    month: "short",
+    day: "numeric",
+    year: "numeric",
+  });
+
+  return (
+    <div
+      className="mood-screen relative flex h-full w-full flex-col"
+      onPointerMove={onPointerMove}
+      onPointerUp={onPointerUp}
+      onPointerCancel={onPointerUp}
+    >
+      <div className="mood-spot" aria-hidden />
+      <div className="mood-desk" aria-hidden />
+
+      <header className="mood-top">
+        <div className="mood-eyebrow">
+          <span className="mood-eyebrow-label">Daily wrap</span>
+          <span className="mood-eyebrow-date">{dateLabel}</span>
+        </div>
+        <div className="mood-heading">
+          <h1 className="mood-title">
+            How did today&apos;s music make you feel?
+          </h1>
+          <p className="mood-subtitle">Drag your feeling into the music box</p>
+        </div>
+        <button type="button" className="mood-skip" onClick={goNext}>
+          SKIP →
+        </button>
+      </header>
+
+      <div className="mood-workspace">
+        <aside className="mood-tray" aria-label="Today I felt">
+          <div className="mood-tray-tape" aria-hidden />
+          <div className="mood-tray-label">Today I Felt</div>
+          <div className="mood-tray-list">
+            {MOOD_OPTIONS.map((mood) => (
+              <button
                 key={mood.label}
-                role="radio"
-                aria-checked={isSelected}
-                aria-label={mood.text}
-                onClick={() => setSelected(mood.label)}
-                initial={reduceMotion ? false : { opacity: 0, y: 16 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{
-                  duration: 0.4,
-                  delay: index * 0.06,
-                  ease: "easeOut",
-                }}
-                whileHover={
-                  reduceMotion ? undefined : { y: -4, scale: 1.04 }
-                }
-                whileTap={reduceMotion ? undefined : { scale: 0.94 }}
-                className={cn(
-                  "relative h-[clamp(3.75rem,8.5dvh,5.25rem)] w-[clamp(3.75rem,8.5dvh,5.25rem)] rounded-full p-0.5 focus:outline-none focus-visible:ring-2 focus-visible:ring-accent/50",
-                  isSelected && "z-10",
-                )}
+                type="button"
+                className="mood-tray-item"
+                onPointerDown={(e) => onPointerDownItem(mood.label, e)}
               >
-                {isSelected && (
-                  <motion.span
-                    className="pointer-events-none absolute -inset-1 rounded-full border-[3px] border-accent"
-                    layoutId="mood-ring"
-                    initial={false}
-                    animate={
-                      reduceMotion
-                        ? {}
-                        : {
-                            boxShadow: [
-                              "0 0 0 0 rgba(212,132,58,0.35)",
-                              "0 0 0 8px rgba(212,132,58,0)",
-                              "0 0 0 0 rgba(212,132,58,0.35)",
-                            ],
-                          }
-                    }
-                    transition={
-                      reduceMotion
-                        ? {}
-                        : { duration: 2, repeat: Infinity, ease: "easeInOut" }
-                    }
-                    aria-hidden
-                  />
-                )}
-                <MoodEmoji label={mood.label} />
-              </motion.button>
-            );
-          })}
+                <MiniVinyl label={mood.label} text={mood.text} />
+              </button>
+            ))}
+          </div>
+        </aside>
+
+        <div
+          className={cn(
+            "mood-box-stage",
+            slots.length > 0 && "has-slots",
+            full && "is-ready",
+          )}
+        >
+          <div className="mood-drag-hint" aria-hidden />
+          <div className="music-box-scene">
+            <div
+              ref={boxRef}
+              className={cn("music-box", full && "is-full")}
+              data-lid={phase === "complete" ? "closed" : "open"}
+              data-count={slots.length}
+              style={
+                {
+                  ["--lid-close" as string]:
+                    phase === "complete" ? 1 : lidClose,
+                } as React.CSSProperties
+              }
+            >
+              <div
+                className="music-box-lid"
+                style={
+                  {
+                    ["--lid-close" as string]:
+                      phase === "complete" ? 1 : lidClose,
+                    transition: lidDragging ? "none" : undefined,
+                  } as React.CSSProperties
+                }
+                onPointerDown={(e) => {
+                  if (!full || phase !== "picking") return;
+                  e.preventDefault();
+                  lidDrag.current = { active: true, startY: e.clientY };
+                  setLidDragging(true);
+                  (e.currentTarget as HTMLElement).setPointerCapture?.(
+                    e.pointerId,
+                  );
+                }}
+              >
+                <div className="music-box-lid-outer" />
+                <div className="music-box-lid-inner">
+                  <span className="music-box-lid-title">
+                    Today&apos;s Music Box
+                  </span>
+                  <span className="music-box-count">
+                    {slots.length} / {SLOT_MAX}
+                  </span>
+                  <div className="music-box-lid-rules" aria-hidden />
+                </div>
+              </div>
+
+              <div className="music-box-cavity">
+                <div className="music-box-cavity-shade" aria-hidden />
+                <div className="music-box-slots">
+                  {slots.length === 0 ? (
+                    <div className="mood-slot-placeholder">
+                      Drop feelings here
+                    </div>
+                  ) : (
+                    slots.map((label, i) => (
+                      <div
+                        key={`${label}-${i}`}
+                        className="mood-slot filled"
+                        style={
+                          {
+                            ["--sx" as string]: `${SLOT_SPREADS[i] ?? (i - 2) * 14}px`,
+                            ["--sr" as string]: `${SLOT_TILTS[i] ?? (i - 2) * 6}deg`,
+                            ["--sz" as string]: 10 + i,
+                          } as React.CSSProperties
+                        }
+                      >
+                        <MiniVinyl label={label} size="box" />
+                      </div>
+                    ))
+                  )}
+                </div>
+              </div>
+
+              <div className="music-box-shell">
+                <div className="music-box-rim" aria-hidden />
+                <div className="music-box-front">
+                  <p>Every song, every feeling, becomes a memory.</p>
+                  <div className="music-box-wave" aria-hidden>
+                    {Array.from({ length: 13 }).map((_, i) => (
+                      <span key={i} />
+                    ))}
+                  </div>
+                </div>
+                <i className="music-box-rivet r1" />
+                <i className="music-box-rivet r2" />
+                <i className="music-box-rivet r3" />
+                <i className="music-box-rivet r4" />
+              </div>
+            </div>
+          </div>
+
+          <p className={cn("mood-lid-hint", full && "ready")}>
+            {full
+              ? "Slide the lid closed to seal today's feelings"
+              : "Fill 5 slots, then slide the lid closed"}
+          </p>
+          {error ? <p className="mt-2 text-sm text-red-400">{error}</p> : null}
         </div>
       </div>
 
-      {error && <p className="shrink-0 text-sm text-red-600">{error}</p>}
+      <div className="mood-decor" aria-hidden>
+        <div className="mood-decor-sleeve" />
+        <div className="mood-decor-polaroid" />
+        <div className="mood-decor-clip" />
+        <div className="mood-decor-pen" />
+      </div>
 
-      <motion.button
-        onClick={handleSave}
-        disabled={!selected || saving}
-        whileHover={reduceMotion || !selected ? undefined : { scale: 1.03 }}
-        whileTap={reduceMotion || !selected ? undefined : { scale: 0.97 }}
-        className="shrink-0 rounded-full border-[1.5px] border-white/70 bg-accent px-12 py-3 text-base font-semibold text-white backdrop-blur-xl transition-colors hover:bg-accent-dark disabled:opacity-40"
+      <div
+        ref={ghostRef}
+        className={cn("mood-drag-ghost", !ghostLabel && "hidden")}
+        aria-hidden
       >
-        {saving ? "保存中..." : "完成"}
-      </motion.button>
+        {ghostLabel ? (
+          <>
+            <div className="mood-drag-trail" />
+            <MiniVinyl label={ghostLabel} size="ghost" />
+          </>
+        ) : null}
+      </div>
+
+      {phase === "complete" ? (
+        <div className="mood-complete">
+          <h2>Feelings boxed.</h2>
+          <p>Your mood for today is sealed in the music box.</p>
+          <button
+            type="button"
+            disabled={saving}
+            onClick={handleContinue}
+            className="rounded-full border border-white/20 bg-white/10 px-8 py-3 text-sm font-semibold backdrop-blur hover:bg-white/15 disabled:opacity-50"
+          >
+            {saving ? "Saving…" : "Continue"}
+          </button>
+        </div>
+      ) : null}
     </div>
   );
 }

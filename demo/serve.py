@@ -6,9 +6,12 @@ import sys
 import threading
 import webbrowser
 from functools import partial
+from urllib.parse import unquote, urlparse
 
 PORT = 3456
 DEMO_DIR = os.path.dirname(os.path.abspath(__file__))
+REPO_ROOT = os.path.dirname(DEMO_DIR)
+MOCK_MUSICS_DIR = os.path.join(REPO_ROOT, "mock musics")
 # 10048 = Windows WSAEADDRINUSE, 48 = macOS/BSD EADDRINUSE
 ADDR_IN_USE = {48, 10048}
 
@@ -21,9 +24,22 @@ class Handler(http.server.SimpleHTTPRequestHandler):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, directory=DEMO_DIR, **kwargs)
 
+    def translate_path(self, path):
+        parsed = unquote(urlparse(path).path)
+        if parsed.startswith("/mock-musics/") or parsed == "/mock-musics":
+            rel = parsed[len("/mock-musics/") :].lstrip("/")
+            root = os.path.normpath(MOCK_MUSICS_DIR)
+            full = os.path.normpath(os.path.join(root, rel))
+            if full != root and not full.startswith(root + os.sep):
+                return os.path.join(DEMO_DIR, "__forbidden__")
+            return full
+        return super().translate_path(path)
+
     def end_headers(self):
         self.send_header("Connection", "close")
         self.send_header("Cache-Control", "no-store")
+        # Allow <audio> / cover fetch from same origin without quirks
+        self.send_header("Accept-Ranges", "bytes")
         super().end_headers()
 
     def log_message(self, fmt, *args):
@@ -41,6 +57,7 @@ def main(port: int = PORT):
         url = f"http://127.0.0.1:{port}"
         print("🎵 音乐日记 Demo")
         print(f"   地址: {url}")
+        print(f"   Mock: {MOCK_MUSICS_DIR}")
         print("   按 Ctrl+C 停止")
         print()
         sys.stdout.flush()

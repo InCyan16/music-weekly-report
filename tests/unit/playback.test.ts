@@ -135,7 +135,7 @@ describe("calculateTopSongs", () => {
 describe("mood stats", () => {
   it("calculates average mood", () => {
     const stats = calculateMoodStats([
-      { local_date: "2026-07-07", mood_score: 5, mood_label: "very_happy" },
+      { local_date: "2026-07-07", mood_score: 5, mood_label: "loved" },
       { local_date: "2026-07-08", mood_score: 3, mood_label: "calm" },
     ]);
     expect(stats.averageMood).toBe(4);
@@ -144,11 +144,11 @@ describe("mood stats", () => {
 
   it("finds dominant mood", () => {
     const stats = calculateMoodStats([
-      { local_date: "2026-07-07", mood_score: 5, mood_label: "very_happy" },
-      { local_date: "2026-07-08", mood_score: 5, mood_label: "very_happy" },
+      { local_date: "2026-07-07", mood_score: 5, mood_label: "loved" },
+      { local_date: "2026-07-08", mood_score: 5, mood_label: "loved" },
       { local_date: "2026-07-09", mood_score: 3, mood_label: "calm" },
     ]);
-    expect(stats.dominantMood).toBe("very_happy");
+    expect(stats.dominantMood).toBe("loved");
   });
 
   it("generates insufficient data summary for 1 day", () => {

@@ -145,11 +145,79 @@
 
     <!-- Screen: Mood -->
     <section id="screen-mood" class="screen mood-screen">
-      <h1 class="mood-title">How does today's music make you feel?</h1>
-      <div class="mood-screen-body">
-        <div class="mood-row" id="mood-row" role="radiogroup" aria-label="Mood"></div>
+      <div class="mood-spot" aria-hidden="true"></div>
+      <div class="mood-desk" aria-hidden="true"></div>
+
+      <header class="mood-top">
+        <div class="mood-eyebrow">
+          <span class="mood-eyebrow-label">Daily wrap</span>
+          <span class="mood-eyebrow-date" id="mood-date"></span>
+        </div>
+        <div class="mood-heading">
+          <h1 class="mood-title">How did today's music make you feel?</h1>
+          <p class="mood-subtitle">Drag your feeling into the music box</p>
+        </div>
+        <button type="button" class="mood-skip" id="btn-mood-skip">SKIP →</button>
+      </header>
+
+      <div class="mood-workspace">
+        <aside class="mood-tray" id="mood-tray" aria-label="Today I felt">
+          <div class="mood-tray-tape" aria-hidden="true"></div>
+          <div class="mood-tray-label">Today I Felt</div>
+          <div class="mood-tray-list" id="mood-tray-list"></div>
+        </aside>
+
+        <div class="mood-box-stage">
+          <div class="mood-drag-hint" aria-hidden="true"></div>
+          <div class="music-box-scene">
+            <div class="music-box" id="music-box" data-lid="open">
+              <div class="music-box-lid" id="music-box-lid">
+                <div class="music-box-lid-outer"></div>
+                <div class="music-box-lid-inner">
+                  <span class="music-box-lid-title">Today's Music Box</span>
+                  <span class="music-box-count" id="mood-box-count">0 / 5</span>
+                  <div class="music-box-lid-rules" aria-hidden="true"></div>
+                </div>
+              </div>
+              <div class="music-box-cavity">
+                <div class="music-box-cavity-shade" aria-hidden="true"></div>
+                <div class="music-box-slots" id="mood-box-slots"></div>
+              </div>
+              <div class="music-box-shell">
+                <div class="music-box-rim" aria-hidden="true"></div>
+                <div class="music-box-front">
+                  <p>Every song, every feeling, becomes a memory.</p>
+                  <div class="music-box-wave" aria-hidden="true">
+                    <span></span><span></span><span></span><span></span><span></span>
+                    <span></span><span></span><span></span><span></span><span></span>
+                    <span></span><span></span><span></span>
+                  </div>
+                </div>
+                <i class="music-box-rivet r1"></i>
+                <i class="music-box-rivet r2"></i>
+                <i class="music-box-rivet r3"></i>
+                <i class="music-box-rivet r4"></i>
+              </div>
+            </div>
+          </div>
+          <p class="mood-lid-hint" id="mood-lid-hint">Fill 5 slots, then slide the lid closed</p>
+        </div>
       </div>
-      <button id="btn-mood-done" class="pill-btn primary mood-done-btn" disabled>Done</button>
+
+      <div class="mood-decor" aria-hidden="true">
+        <div class="mood-decor-sleeve"></div>
+        <div class="mood-decor-polaroid"></div>
+        <div class="mood-decor-clip"></div>
+        <div class="mood-decor-pen"></div>
+      </div>
+
+      <div id="mood-complete" class="mood-complete hidden">
+        <h2>Feelings boxed.</h2>
+        <p>Your mood for today is sealed in the music box.</p>
+        <button type="button" id="btn-mood-continue" class="pill-btn primary">Continue</button>
+      </div>
+
+      <div id="mood-drag-ghost" class="mood-drag-ghost hidden" aria-hidden="true"></div>
     </section>
 
     <!-- Screen: Report -->

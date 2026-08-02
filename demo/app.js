@@ -3,23 +3,42 @@
  * No backend required. Run: python3 demo/serve.py
  */
 
+function mockUrl(folder, file) {
+  return `/mock-musics/${encodeURIComponent(folder)}/${encodeURIComponent(file)}`;
+}
+
+function trackFromFolder(folder, color) {
+  const sep = folder.lastIndexOf("_");
+  const title = sep >= 0 ? folder.slice(0, sep) : folder;
+  const artist = sep >= 0 ? folder.slice(sep + 1) : "Unknown";
+  return {
+    id: folder,
+    title,
+    artist,
+    album: "",
+    durationMs: 0,
+    color,
+    coverUrl: mockUrl(folder, "bg.jpg"),
+    audioUrl: mockUrl(folder, "track.mp3"),
+  };
+}
+
 const TRACKS = [
-  { id: "1", title: "Golden Hour", artist: "Mock Artist", album: "Demo Album", durationMs: 45000, color: "#d4843a" },
-  { id: "2", title: "Midnight Drive", artist: "Test Band", album: "Night Sessions", durationMs: 180000, color: "#5a7ec4" },
-  { id: "3", title: "Rainy Sunday", artist: "Lo-Fi Collective", album: "Calm Days", durationMs: 240000, color: "#6a9e72" },
-  { id: "4", title: "City Lights", artist: "Urban Echo", album: "Neon", durationMs: 210000, color: "#c45c4a" },
-  { id: "5", title: "Soft Landing", artist: "Ambient Works", album: "Drift", durationMs: 320000, color: "#8b7ec8" },
-  { id: "6", title: "Morning Coffee", artist: "Lin Yi", album: "Everyday", durationMs: 195000, color: "#d4b83a" },
+  trackFromFolder("Constellate_Chime", "#d4843a"),
+  trackFromFolder("Mantis_Akira", "#5a7ec4"),
+  trackFromFolder("Nose art_flying lotus", "#6a9e72"),
+  trackFromFolder("dsco_sweettrip", "#c45c4a"),
+  trackFromFolder("影子_大象体操", "#8b7ec8"),
 ];
 
 const TWEMOJI_CDN =
   "https://cdn.jsdelivr.net/gh/jdecked/twemoji@17.0.2/assets/svg";
 
 const MOOD_TWEMOJI = {
-  very_happy: "1f604",
+  loved: "1f60d",
   happy: "1f60a",
   calm: "1f60c",
-  low: "1f614",
+  tired: "1f62b",
   sad: "1f622",
 };
 
@@ -27,13 +46,16 @@ function twemojiUrl(label) {
   return `${TWEMOJI_CDN}/${MOOD_TWEMOJI[label]}.svg`;
 }
 
+/** Tray order matches concept art; scores unchanged. */
 const MOODS = [
-  { label: "very_happy", score: 5, emoji: "😄", text: "Very happy" },
-  { label: "happy", score: 4, emoji: "😊", text: "Happy" },
-  { label: "calm", score: 3, emoji: "😌", text: "Calm" },
-  { label: "low", score: 2, emoji: "😔", text: "Low" },
-  { label: "sad", score: 1, emoji: "😢", text: "Sad" },
+  { label: "happy", score: 4, emoji: "😊", text: "Happy", color: "#e8c84a" },
+  { label: "loved", score: 5, emoji: "😍", text: "Loved", color: "#e891b0" },
+  { label: "calm", score: 3, emoji: "😌", text: "Calm", color: "#9ec5d6" },
+  { label: "tired", score: 2, emoji: "😫", text: "Tired", color: "#c9b896" },
+  { label: "sad", score: 1, emoji: "😢", text: "Sad", color: "#9b8ec4" },
 ];
+
+const MOOD_SLOT_MAX = 5;
 
 const VALID_THRESHOLD_MS = 30000;
 const STORAGE_KEY = "music-diary-demo";
@@ -52,6 +74,8 @@ const state = {
   validPlays: [],    // { sessionId, trackId, track, listenedAt }
   mood: null,
   selectedMood: null,
+  moodSlots: [],
+  moodPhase: "picking", // picking | complete
   manualRotationDeg: 0,
   isScrubbing: false,
 };
@@ -59,6 +83,62 @@ const state = {
 let tickInterval = null;
 let lastSearchResults = [];
 let focusedResult = -1;
+let audioEl = null;
+
+function getAudio() {
+  if (audioEl) return audioEl;
+  audioEl = new Audio();
+  audioEl.preload = "auto";
+  audioEl.addEventListener("ended", () => {
+    if (!state.currentTrack) return;
+    state.positionMs = state.currentTrack.durationMs || audioEl.duration * 1000;
+    onTrackEnded();
+  });
+  audioEl.addEventListener("loadedmetadata", () => {
+    if (!state.currentTrack || !Number.isFinite(audioEl.duration)) return;
+    const ms = Math.round(audioEl.duration * 1000);
+    state.currentTrack.durationMs = ms;
+    const catalog = TRACKS.find((t) => t.id === state.currentTrack.id);
+    if (catalog) catalog.durationMs = ms;
+    if (els.searchResults && !els.searchResults.classList.contains("hidden")) {
+      handleSearch(els.searchInput?.value || "");
+    }
+  });
+  audioEl.addEventListener("timeupdate", () => {
+    if (!state.isPlaying || state.isScrubbing || !state.currentTrack) return;
+    state.positionMs = audioEl.currentTime * 1000;
+    checkQualify();
+  });
+  return audioEl;
+}
+
+function stopAudioElement() {
+  if (!audioEl) return;
+  try {
+    audioEl.pause();
+    audioEl.removeAttribute("src");
+    audioEl.load();
+  } catch { /* ignore */ }
+}
+
+function syncAudioToPosition() {
+  if (!audioEl || !state.currentTrack) return;
+  const dur = audioEl.duration;
+  if (!Number.isFinite(dur) || dur <= 0) return;
+  const t = Math.max(0, Math.min(state.positionMs / 1000, dur));
+  if (Math.abs(audioEl.currentTime - t) > 0.05) {
+    audioEl.currentTime = t;
+  }
+}
+
+function trackDurationMs(track) {
+  if (!track) return 0;
+  if (track.durationMs > 0) return track.durationMs;
+  if (audioEl && Number.isFinite(audioEl.duration) && audioEl.duration > 0) {
+    return Math.round(audioEl.duration * 1000);
+  }
+  return 180000;
+}
 
 // ─── DOM refs ────────────────────────────────────────────
 const $ = (sel) => document.querySelector(sel);
@@ -80,8 +160,17 @@ const els = {
   btnFinish: $("#btn-finish"),
   playCount: $("#play-count"),
   weekDots: $("#week-dots"),
-  moodRow: $("#mood-row"),
-  btnMoodDone: $("#btn-mood-done"),
+  moodTrayList: $("#mood-tray-list"),
+  moodBoxSlots: $("#mood-box-slots"),
+  moodBoxCount: $("#mood-box-count"),
+  moodBox: $("#music-box"),
+  moodBoxLid: $("#music-box-lid"),
+  moodLidHint: $("#mood-lid-hint"),
+  moodComplete: $("#mood-complete"),
+  moodDragGhost: $("#mood-drag-ghost"),
+  moodDate: $("#mood-date"),
+  btnMoodSkip: $("#btn-mood-skip"),
+  btnMoodContinue: $("#btn-mood-continue"),
   weekRange: $("#week-range"),
   reportVinyls: $("#report-vinyls"),
   moodStats: $("#mood-stats"),
@@ -112,6 +201,7 @@ function loadState() {
     const saved = JSON.parse(localStorage.getItem(STORAGE_KEY) || "{}");
     if (saved.validPlays) state.validPlays = saved.validPlays;
     if (saved.mood) state.mood = saved.mood;
+    if (Array.isArray(saved.moodSlots)) state.moodSlots = saved.moodSlots.slice(0, MOOD_SLOT_MAX);
   } catch { /* ignore */ }
 }
 
@@ -119,6 +209,7 @@ function saveState() {
   localStorage.setItem(STORAGE_KEY, JSON.stringify({
     validPlays: state.validPlays,
     mood: state.mood,
+    moodSlots: state.moodSlots,
   }));
 }
 
@@ -130,14 +221,18 @@ function showScreen(name) {
   if (name === "report") renderReport();
 }
 
-/** 与向左拖唱片相同：有曲则滑出空白碟；已是空白则无反应 */
+/** 与向左拖相同：有后续历史则前进，否则（最新一首）出空白碟 */
 function goNextSongLikeSwipe() {
   if (!state.currentTrack) return;
-  swapToBlankRecord(-1);
+  if (canGoHistory(1)) goHistory(1, { animate: true });
+  else swapToBlankRecord(-1);
 }
 
 function goToMoodScreen() {
   pausePlayback();
+  state.moodSlots = [];
+  state.moodPhase = "picking";
+  state.selectedMood = null;
   showScreen("mood");
 }
 
@@ -192,6 +287,7 @@ function renderSearchResults(tracks) {
 
 // ─── Playback ────────────────────────────────────────────
 function playTrack(track, { appendHistory = true } = {}) {
+  const fromBlank = !state.currentTrack;
   endCurrentSession("changed_track");
   state.currentTrack = track;
   state.sessionId = crypto.randomUUID();
@@ -199,6 +295,10 @@ function playTrack(track, { appendHistory = true } = {}) {
   state.accumulatedMs = 0;
   state.qualified = false;
   if (appendHistory) {
+    // 非末尾选新歌：截断「未来」再追加，避免盖掉已听列表
+    if (state.historyIndex >= 0 && state.historyIndex < state.history.length - 1) {
+      state.history = state.history.slice(0, state.historyIndex + 1);
+    }
     state.history.push({
       sessionId: state.sessionId,
       track,
@@ -207,8 +307,14 @@ function playTrack(track, { appendHistory = true } = {}) {
     });
     state.historyIndex = state.history.length - 1;
   }
+
+  const audio = getAudio();
+  audio.pause();
+  audio.src = track.audioUrl || "";
+  audio.currentTime = 0;
+
   startPlayback();
-  updateUI();
+  updateUI({ fadeInCover: fromBlank });
 }
 
 function canGoHistory(delta) {
@@ -232,6 +338,14 @@ function startPlayback() {
   els.vinylDisc.classList.add("spinning");
   els.vinylDisc.style.transform = "";
   updateTonearm();
+  const audio = getAudio();
+  if (state.currentTrack?.audioUrl) {
+    syncAudioToPosition();
+    const playPromise = audio.play();
+    if (playPromise && typeof playPromise.catch === "function") {
+      playPromise.catch(() => { /* autoplay / missing file */ });
+    }
+  }
 }
 
 function pausePlayback() {
@@ -241,9 +355,13 @@ function pausePlayback() {
   }
   state.isPlaying = false;
   stopTick();
+  if (audioEl) {
+    try { audioEl.pause(); } catch { /* ignore */ }
+  }
   els.vinylDisc.classList.remove("spinning");
-  els.vinylDisc.style.transform = state.currentTrack
-    ? `rotate(${(state.positionMs / state.currentTrack.durationMs) * 360}deg)`
+  const dur = state.currentTrack?.durationMs || 0;
+  els.vinylDisc.style.transform = state.currentTrack && dur
+    ? `rotate(${(state.positionMs / dur) * 360}deg)`
     : "";
   updateTonearm();
   checkQualify();
@@ -262,10 +380,25 @@ function startTick() {
   stopTick();
   tickInterval = setInterval(() => {
     if (!state.isPlaying || !state.currentTrack || state.isScrubbing) return;
-    state.positionMs += 250;
-    if (state.positionMs >= state.currentTrack.durationMs) {
-      state.positionMs = state.currentTrack.durationMs;
-      onTrackEnded();
+    // Prefer audio clock when available
+    if (audioEl && Number.isFinite(audioEl.currentTime)) {
+      state.positionMs = audioEl.currentTime * 1000;
+      const dur = state.currentTrack.durationMs || (audioEl.duration * 1000);
+      if (dur && state.positionMs >= dur - 50) {
+        state.positionMs = dur;
+        onTrackEnded();
+        return;
+      }
+    } else {
+      state.positionMs += 250;
+      if (
+        state.currentTrack.durationMs &&
+        state.positionMs >= state.currentTrack.durationMs
+      ) {
+        state.positionMs = state.currentTrack.durationMs;
+        onTrackEnded();
+        return;
+      }
     }
     checkQualify();
   }, 250);
@@ -283,7 +416,9 @@ function onTrackEnded() {
 
 function seek(ms) {
   if (!state.currentTrack) return;
-  state.positionMs = Math.max(0, Math.min(ms, state.currentTrack.durationMs));
+  const dur = state.currentTrack.durationMs || (audioEl?.duration ? audioEl.duration * 1000 : 0);
+  state.positionMs = Math.max(0, Math.min(ms, dur || ms));
+  syncAudioToPosition();
   updateVinylRotation();
 }
 
@@ -349,8 +484,10 @@ function goHistory(delta, { animate = false } = {}) {
     return true;
   }
 
-  // 回到上一首：当前碟向右出，历史碟从左进
-  animateDiscSwap(1, apply);
+  // 向后(delta<0 / 空白恢复)：当前出右、旧碟从左进
+  // 向前(delta>0)：当前出左、下一首从右进
+  const animDir = !state.currentTrack || delta < 0 ? 1 : -1;
+  animateDiscSwap(animDir, apply);
   return true;
 }
 
@@ -372,12 +509,13 @@ function animateDiscSwap(direction, onDone) {
   incoming.classList.add("swap-active", inClass);
 
   const cleanup = () => {
+    // Apply state (e.g. clear cover for blank) before revealing the disc again
+    onDone();
     disc.classList.remove("swapping", outClass);
     incoming.classList.remove("swap-active", inClass);
     disc.style.transition = "none";
     disc.style.transform = "";
     state.isScrubbing = false;
-    onDone();
     requestAnimationFrame(() => {
       disc.style.transition = "";
     });
@@ -389,11 +527,13 @@ function animateDiscSwap(direction, onDone) {
 // ─── Swap in a fresh blank record with a slide animation ──
 function swapToBlankRecord(direction) {
   animateDiscSwap(direction, () => {
+    stopAudioElement();
     state.currentTrack = null;
     state.sessionId = null;
     state.positionMs = 0;
     state.accumulatedMs = 0;
     state.qualified = false;
+    clearVinylCover();
     updateUI();
   });
 }
@@ -492,8 +632,9 @@ function setupVinylGestures() {
     active = false;
     if (gestureMode === "rotate" && state.currentTrack) {
       state.positionMs = startPositionMs;
-      state.manualRotationDeg =
-        (startPositionMs / state.currentTrack.durationMs) * 360;
+      const dur = trackDurationMs(state.currentTrack);
+      state.manualRotationDeg = dur ? (startPositionMs / dur) * 360 : 0;
+      syncAudioToPosition();
       if (state.isPlaying) {
         els.vinylDisc.style.transform = "";
       } else {
@@ -553,11 +694,10 @@ function setupVinylGestures() {
       state.manualRotationDeg = visualDeg;
       els.vinylDisc.style.transform = `rotate(${visualDeg}deg)`;
 
-      const deltaMs = (scrubAccumDeg / 360) * state.currentTrack.durationMs;
-      state.positionMs = Math.max(
-        0,
-        Math.min(startPositionMs + deltaMs, state.currentTrack.durationMs),
-      );
+      const durMs = trackDurationMs(state.currentTrack);
+      const deltaMs = (scrubAccumDeg / 360) * durMs;
+      state.positionMs = Math.max(0, Math.min(startPositionMs + deltaMs, durMs));
+      syncAudioToPosition();
     }
   };
 
@@ -581,6 +721,7 @@ function setupVinylGestures() {
         goHistory(-1, { animate: true });
       }
     } else if (mode === "rotate") {
+      syncAudioToPosition();
       clearScrubVisual();
       updateVinylRotation();
     }
@@ -670,8 +811,22 @@ function updateWeekDots() {
 }
 
 // ─── UI updates ──────────────────────────────────────────
-function updateUI() {
+function clearVinylCover() {
+  const label = $("#vinyl-label");
+  if (els.coverImg) {
+    els.coverImg.removeAttribute("src");
+    els.coverImg.hidden = true;
+  }
+  if (els.coverFallback) {
+    els.coverFallback.hidden = true;
+    els.coverFallback.style.background = "";
+  }
+  label?.classList.remove("has-cover", "cover-fade-in");
+}
+
+function updateUI({ fadeInCover = false } = {}) {
   const t = state.currentTrack;
+  const label = $("#vinyl-label");
   if (t) {
     els.songTitle.textContent = t.title;
     els.songArtist.textContent = `${t.artist}${t.album ? ` · ${t.album}` : ""}`;
@@ -679,17 +834,25 @@ function updateUI() {
       els.coverImg.src = t.coverUrl;
       els.coverImg.hidden = false;
       els.coverFallback.hidden = true;
+      label?.classList.add("has-cover");
+      if (fadeInCover && label) {
+        label.classList.remove("cover-fade-in");
+        // restart CSS animation
+        void label.offsetWidth;
+        label.classList.add("cover-fade-in");
+        const onEnd = () => label.classList.remove("cover-fade-in");
+        label.addEventListener("animationend", onEnd, { once: true });
+      }
     } else {
+      clearVinylCover();
       els.coverFallback.textContent = "";
       els.coverFallback.style.background = `linear-gradient(135deg, ${t.color || "#d4843a"}, #333)`;
       els.coverFallback.hidden = false;
-      els.coverImg.hidden = true;
     }
   } else {
     els.songTitle.textContent = "";
     els.songArtist.textContent = "";
-    els.coverImg.hidden = true;
-    els.coverFallback.hidden = true;
+    clearVinylCover();
   }
   els.vinylDisc.classList.toggle("empty", !state.currentTrack);
   if (els.btnNextSong) els.btnNextSong.disabled = !state.currentTrack;
@@ -714,28 +877,240 @@ function fmt(ms) {
   return `${Math.floor(s / 60)}:${(s % 60).toString().padStart(2, "0")}`;
 }
 
-// ─── Mood ────────────────────────────────────────────────
-function renderMoodPicker() {
-  els.moodRow.innerHTML = MOODS.map(
-    (m, i) => `
-    <button class="mood-item" data-label="${m.label}" role="radio" aria-checked="false" style="animation-delay:${i * 60}ms">
-      <div class="mood-ring"></div>
-      <span class="mood-face"><img src="${twemojiUrl(m.label)}" alt="" draggable="false" /></span>
-      <span class="mood-label">${m.text}</span>
-    </button>`,
-  ).join("");
+// ─── Mood box ────────────────────────────────────────────
+function primaryMoodFromSlots(slots) {
+  if (!slots.length) return null;
+  const counts = new Map();
+  for (const s of slots) counts.set(s, (counts.get(s) || 0) + 1);
+  let best = slots[slots.length - 1];
+  let bestCount = 0;
+  for (const s of slots) {
+    const c = counts.get(s) || 0;
+    if (c >= bestCount) {
+      best = s;
+      bestCount = c;
+    }
+  }
+  return MOODS.find((m) => m.label === best) || null;
+}
 
-  els.moodRow.querySelectorAll(".mood-item").forEach((btn) => {
-    btn.addEventListener("click", () => {
-      els.moodRow.querySelectorAll(".mood-item").forEach((b) => {
-        b.classList.remove("selected");
-        b.setAttribute("aria-checked", "false");
-      });
-      btn.classList.add("selected");
-      btn.setAttribute("aria-checked", "true");
-      state.selectedMood = MOODS.find((m) => m.label === btn.dataset.label);
-      els.btnMoodDone.disabled = false;
+function moodColor(label) {
+  return MOODS.find((m) => m.label === label)?.color || "#888";
+}
+
+function moodMiniVinylHtml(label, text, { size = "" } = {}) {
+  const sizeClass = size ? ` mood-mini-vinyl--${size}` : "";
+  return `
+    <div class="mood-mini-vinyl${sizeClass}" data-label="${label}">
+      <div class="mood-mini-disc">
+        <div class="mood-mini-sheen" aria-hidden="true"></div>
+        <div class="mood-mini-grooves" aria-hidden="true"></div>
+        <div class="mood-mini-label" style="background:${moodColor(label)}">
+          <img src="${twemojiUrl(label)}" alt="" draggable="false" />
+        </div>
+        <div class="mood-mini-hole" aria-hidden="true"></div>
+      </div>
+      ${text ? `<span class="mood-mini-text">${text}</span>` : ""}
+    </div>`;
+}
+
+function renderMoodPicker() {
+  if (els.moodDate) {
+    els.moodDate.textContent = new Date().toLocaleDateString("en-US", {
+      month: "short", day: "numeric", year: "numeric",
     });
+  }
+
+  if (els.moodTrayList) {
+    els.moodTrayList.innerHTML = MOODS.map(
+      (m) => `
+      <button type="button" class="mood-tray-item" data-label="${m.label}">
+        ${moodMiniVinylHtml(m.label, m.text)}
+      </button>`,
+    ).join("");
+  }
+
+  renderMoodBoxSlots();
+  updateMoodBoxChrome();
+
+  if (els.moodComplete) {
+    els.moodComplete.classList.toggle("hidden", state.moodPhase !== "complete");
+  }
+  if (els.moodBox) {
+    els.moodBox.dataset.lid = state.moodPhase === "complete" ? "closed" : "open";
+    els.moodBox.classList.toggle("is-full", state.moodSlots.length >= MOOD_SLOT_MAX);
+  }
+
+  setupMoodDrag();
+}
+
+function renderMoodBoxSlots() {
+  if (!els.moodBoxSlots) return;
+  const n = state.moodSlots.length;
+  const spreads = [-28, -14, 0, 14, 28];
+  const tilts = [-18, -8, 4, -6, 12];
+  const cells = state.moodSlots.map((label, i) => {
+    const x = spreads[i] ?? (i - 2) * 14;
+    const r = tilts[i] ?? (i - 2) * 6;
+    const z = 10 + i;
+    return `
+      <div class="mood-slot filled" style="--sx:${x}px;--sr:${r}deg;--sz:${z}">
+        ${moodMiniVinylHtml(label, "", { size: "box" })}
+      </div>`;
+  });
+  if (!n) {
+    cells.push('<div class="mood-slot-placeholder">Drop feelings here</div>');
+  }
+  els.moodBoxSlots.innerHTML = cells.join("");
+  els.moodBoxSlots.dataset.count = String(n);
+}
+
+function updateMoodBoxChrome() {
+  const n = state.moodSlots.length;
+  if (els.moodBoxCount) els.moodBoxCount.textContent = `${n} / ${MOOD_SLOT_MAX}`;
+  if (els.moodLidHint) {
+    els.moodLidHint.textContent =
+      n >= MOOD_SLOT_MAX
+        ? "Slide the lid closed to seal today's feelings"
+        : "Fill 5 slots, then slide the lid closed";
+    els.moodLidHint.classList.toggle("ready", n >= MOOD_SLOT_MAX);
+  }
+  if (els.moodBox) {
+    els.moodBox.classList.toggle("is-full", n >= MOOD_SLOT_MAX);
+    els.moodBox.dataset.count = String(n);
+  }
+  const stage = els.moodBox?.closest(".mood-box-stage");
+  stage?.classList.toggle("has-slots", n > 0);
+  stage?.classList.toggle("is-ready", n >= MOOD_SLOT_MAX);
+}
+
+function addMoodSlot(label) {
+  if (state.moodPhase !== "picking") return;
+  if (state.moodSlots.length >= MOOD_SLOT_MAX) return;
+  if (!MOODS.some((m) => m.label === label)) return;
+  state.moodSlots.push(label);
+  renderMoodBoxSlots();
+  updateMoodBoxChrome();
+}
+
+function sealMoodBox() {
+  if (state.moodSlots.length < MOOD_SLOT_MAX) return;
+  const primary = primaryMoodFromSlots(state.moodSlots);
+  if (!primary) return;
+  state.selectedMood = primary;
+  state.mood = {
+    label: primary.label,
+    score: primary.score,
+    date: new Date().toISOString(),
+    slots: state.moodSlots.slice(),
+  };
+  state.moodPhase = "complete";
+  saveState();
+  if (els.moodBox) els.moodBox.dataset.lid = "closed";
+  if (els.moodComplete) els.moodComplete.classList.remove("hidden");
+}
+
+function skipMood() {
+  state.moodPhase = "picking";
+  state.moodSlots = [];
+  showScreen("report");
+}
+
+function setupMoodDrag() {
+  if (!els.moodTrayList || !els.moodBox) return;
+  if (els.moodTrayList.dataset.dragBound === "1") return;
+  els.moodTrayList.dataset.dragBound = "1";
+
+  let dragLabel = null;
+  let dragging = false;
+  let dragMoved = false;
+  let startX = 0;
+  let startY = 0;
+
+  const ghost = els.moodDragGhost;
+
+  const moveGhost = (x, y) => {
+    if (!ghost) return;
+    ghost.style.left = `${x}px`;
+    ghost.style.top = `${y}px`;
+  };
+
+  const endDrag = (x, y) => {
+    if (!dragging) return;
+    dragging = false;
+    ghost?.classList.add("hidden");
+    const box = els.moodBox.getBoundingClientRect();
+    const hit =
+      x >= box.left && x <= box.right && y >= box.top && y <= box.bottom;
+    if (dragLabel) {
+      if (hit || !dragMoved) addMoodSlot(dragLabel);
+    }
+    dragLabel = null;
+    dragMoved = false;
+  };
+
+  const startDrag = (label, x, y) => {
+    if (state.moodPhase !== "picking") return;
+    if (state.moodSlots.length >= MOOD_SLOT_MAX) return;
+    dragLabel = label;
+    dragging = true;
+    dragMoved = false;
+    startX = x;
+    startY = y;
+    if (ghost) {
+      ghost.innerHTML = `
+        <div class="mood-drag-trail" aria-hidden="true"></div>
+        ${moodMiniVinylHtml(label, "", { size: "ghost" })}`;
+      ghost.classList.remove("hidden");
+      moveGhost(x, y);
+    }
+  };
+
+  els.moodTrayList.addEventListener("pointerdown", (e) => {
+    const item = e.target.closest(".mood-tray-item");
+    if (!item) return;
+    e.preventDefault();
+    item.setPointerCapture?.(e.pointerId);
+    startDrag(item.dataset.label, e.clientX, e.clientY);
+  });
+
+  window.addEventListener("pointermove", (e) => {
+    if (!dragging) return;
+    if (Math.hypot(e.clientX - startX, e.clientY - startY) > 8) dragMoved = true;
+    moveGhost(e.clientX, e.clientY);
+  });
+
+  window.addEventListener("pointerup", (e) => endDrag(e.clientX, e.clientY));
+  window.addEventListener("pointercancel", (e) => endDrag(e.clientX, e.clientY));
+
+  // Lid slide to close
+  let lidDragging = false;
+  let lidStartY = 0;
+  let lidDelta = 0;
+
+  els.moodBoxLid?.addEventListener("pointerdown", (e) => {
+    if (state.moodSlots.length < MOOD_SLOT_MAX || state.moodPhase !== "picking") return;
+    lidDragging = true;
+    lidStartY = e.clientY;
+    lidDelta = 0;
+    els.moodBoxLid.setPointerCapture?.(e.pointerId);
+  });
+
+  window.addEventListener("pointermove", (e) => {
+    if (!lidDragging || !els.moodBoxLid) return;
+    lidDelta = Math.max(0, e.clientY - lidStartY);
+    const pct = Math.min(lidDelta / 120, 1);
+    els.moodBoxLid.style.setProperty("--lid-close", String(pct));
+  });
+
+  window.addEventListener("pointerup", () => {
+    if (!lidDragging) return;
+    lidDragging = false;
+    if (lidDelta > 48) {
+      sealMoodBox();
+    }
+    if (els.moodBoxLid) els.moodBoxLid.style.setProperty("--lid-close", "0");
+    lidDelta = 0;
   });
 }
 
@@ -960,14 +1335,8 @@ function bindEvents() {
     goToMoodScreen();
   });
 
-  els.btnMoodDone.addEventListener("click", () => {
-    if (!state.selectedMood) return;
-    state.mood = {
-      label: state.selectedMood.label,
-      score: state.selectedMood.score,
-      date: new Date().toISOString(),
-    };
-    saveState();
+  els.btnMoodSkip?.addEventListener("click", () => skipMood());
+  els.btnMoodContinue?.addEventListener("click", () => {
     showScreen("report");
   });
 

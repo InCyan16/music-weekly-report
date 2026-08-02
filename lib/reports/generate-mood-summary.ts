@@ -1,11 +1,13 @@
 import { type MoodStats } from "@/lib/reports/calculate-mood-stats";
 
 const MOOD_TEXT: Record<string, string> = {
-  very_happy: "非常开心",
-  happy: "开心",
-  calm: "平静",
-  low: "低落",
-  sad: "难过",
+  loved: "Loved",
+  happy: "Happy",
+  calm: "Calm",
+  tired: "Tired",
+  sad: "Sad",
+  very_happy: "Loved",
+  low: "Tired",
 };
 
 export function generateMoodSummary(stats: MoodStats): string {
@@ -27,12 +29,17 @@ export function generateMoodSummary(stats: MoodStats): string {
       );
     } else if (
       stats.dominantMood === "happy" ||
+      stats.dominantMood === "loved" ||
       stats.dominantMood === "very_happy"
     ) {
       parts.push(
         `快乐是这周最常出现的状态，你听音乐的频率也比较高。`,
       );
-    } else if (stats.dominantMood === "low" || stats.dominantMood === "sad") {
+    } else if (
+      stats.dominantMood === "tired" ||
+      stats.dominantMood === "low" ||
+      stats.dominantMood === "sad"
+    ) {
       parts.push("音乐似乎成了你情绪的出口，那些旋律陪伴你度过了一些不太轻松的时刻。");
     }
   }

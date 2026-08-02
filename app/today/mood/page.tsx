@@ -11,7 +11,7 @@ export default async function MoodPage() {
   if (!user) redirect("/login");
 
   return (
-    <main className="flex h-dvh w-full flex-col px-8">
+    <main className="flex h-dvh max-h-dvh w-full flex-col overflow-hidden bg-[#070605]">
       <MoodPicker />
     </main>
   );

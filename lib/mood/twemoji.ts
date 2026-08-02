@@ -5,10 +5,10 @@ export const TWEMOJI_CDN =
   "https://cdn.jsdelivr.net/gh/jdecked/twemoji@17.0.2/assets/svg";
 
 export const MOOD_TWEMOJI: Record<MoodLabel, string> = {
-  very_happy: "1f604",
+  loved: "1f60d",
   happy: "1f60a",
   calm: "1f60c",
-  low: "1f614",
+  tired: "1f62b",
   sad: "1f622",
 };
 
