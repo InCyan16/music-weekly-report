@@ -56,9 +56,6 @@ const state = {
   isScrubbing: false,
 };
 
-let audioCtx = null;
-let oscillator = null;
-let gainNode = null;
 let tickInterval = null;
 let lastSearchResults = [];
 let focusedResult = -1;
@@ -133,11 +130,10 @@ function showScreen(name) {
   if (name === "report") renderReport();
 }
 
-/** 与向右拖唱片相同：有下一首则前进，否则滑出空唱片 */
+/** 与向左拖唱片相同：有曲则滑出空白碟；已是空白则无反应 */
 function goNextSongLikeSwipe() {
   if (!state.currentTrack) return;
-  if (canGoHistory(1)) goHistory(1, { animate: true });
-  else swapToBlankRecord(1);
+  swapToBlankRecord(-1);
 }
 
 function goToMoodScreen() {
@@ -216,7 +212,15 @@ function playTrack(track, { appendHistory = true } = {}) {
 }
 
 function canGoHistory(delta) {
-  if (!state.currentTrack) return false;
+  if (state.history.length === 0) return false;
+  // 空白碟：只能「向后」恢复当前 historyIndex 那一首
+  if (!state.currentTrack) {
+    return (
+      delta < 0 &&
+      state.historyIndex >= 0 &&
+      state.historyIndex < state.history.length
+    );
+  }
   const newIndex = state.historyIndex + delta;
   return newIndex >= 0 && newIndex < state.history.length;
 }
@@ -224,7 +228,6 @@ function canGoHistory(delta) {
 function startPlayback() {
   state.isPlaying = true;
   state.lastPlayStart = performance.now();
-  startAudio();
   startTick();
   els.vinylDisc.classList.add("spinning");
   els.vinylDisc.style.transform = "";
@@ -237,7 +240,6 @@ function pausePlayback() {
     state.lastPlayStart = null;
   }
   state.isPlaying = false;
-  stopAudio();
   stopTick();
   els.vinylDisc.classList.remove("spinning");
   els.vinylDisc.style.transform = state.currentTrack
@@ -249,36 +251,17 @@ function pausePlayback() {
 
 function updateTonearm() {
   if (!els.tonearm) return;
-  els.tonearm.classList.toggle("on-record", !!(state.currentTrack && state.isPlaying));
-}
-
-function startAudio() {
-  try {
-    if (!audioCtx) audioCtx = new AudioContext();
-    stopAudio();
-    oscillator = audioCtx.createOscillator();
-    gainNode = audioCtx.createGain();
-    oscillator.type = "sine";
-    oscillator.frequency.value = 220 + (state.historyIndex * 30);
-    gainNode.gain.value = 0.04;
-    oscillator.connect(gainNode);
-    gainNode.connect(audioCtx.destination);
-    oscillator.start();
-  } catch { /* audio unavailable */ }
-}
-
-function stopAudio() {
-  try {
-    oscillator?.stop();
-    oscillator?.disconnect();
-  } catch { /* ignore */ }
-  oscillator = null;
+  const hasTrack = !!state.currentTrack;
+  const isActive = !!(state.currentTrack && state.isPlaying);
+  els.tonearm.classList.toggle("on-record", isActive);
+  els.vinylStage?.classList.toggle("has-track", hasTrack);
+  els.vinylStage?.classList.toggle("is-playing", isActive);
 }
 
 function startTick() {
   stopTick();
   tickInterval = setInterval(() => {
-    if (!state.isPlaying || !state.currentTrack) return;
+    if (!state.isPlaying || !state.currentTrack || state.isScrubbing) return;
     state.positionMs += 250;
     if (state.positionMs >= state.currentTrack.durationMs) {
       state.positionMs = state.currentTrack.durationMs;
@@ -349,8 +332,12 @@ function endCurrentSession(reason) {
 
 function goHistory(delta, { animate = false } = {}) {
   if (!canGoHistory(delta)) return false;
-  const newIndex = state.historyIndex + delta;
+  // 空白碟恢复：仍用当前 historyIndex；有曲碟则按 delta 移动
+  const newIndex = !state.currentTrack
+    ? state.historyIndex
+    : state.historyIndex + delta;
   const item = state.history[newIndex];
+  if (!item) return false;
 
   const apply = () => {
     state.historyIndex = newIndex;
@@ -362,7 +349,8 @@ function goHistory(delta, { animate = false } = {}) {
     return true;
   }
 
-  animateDiscSwap(delta < 0 ? -1 : 1, apply);
+  // 回到上一首：当前碟向右出，历史碟从左进
+  animateDiscSwap(1, apply);
   return true;
 }
 
@@ -410,23 +398,62 @@ function swapToBlankRecord(direction) {
   });
 }
 
-// ─── Vinyl gestures: rotate = seek, swipe = swap record ──
+// ─── Vinyl gestures: label = scrub along yellow circle, outer = swipe ──
 function setupVinylGestures() {
+  const LABEL_R = 0.17; // yellow label radius ≈ 34% diameter / 2
+  const LABEL_HIT_R = 0.19; // slightly larger so edge sliding stays hittable
+  const LABEL_CANCEL_R = 0.22; // leave yellow neighborhood → cancel scrub
+
   let startX = 0;
   let startY = 0;
-  let startAngle = 0;
   let startPositionMs = 0;
   let gestureMode = null; // 'rotate' | 'swipe'
+  let lockZone = null; // 'label' | 'outer'
   let active = false;
+  let cancelled = false;
+  let lastFingerAngle = 0;
+  let scrubBaseDeg = 0;
+  let scrubAccumDeg = 0;
 
-  const center = () => {
-    const r = els.vinylStage.getBoundingClientRect();
-    return { x: r.left + r.width / 2, y: r.top + r.height / 2 };
+  const discMetrics = () => {
+    const disc = els.vinylDisc;
+    const rect = disc.getBoundingClientRect();
+    return {
+      cx: rect.left + rect.width / 2,
+      cy: rect.top + rect.height / 2,
+      rx: Math.max(rect.width / 2, 1),
+      ry: Math.max(rect.height / 2, 1),
+    };
   };
 
-  const angleAt = (x, y) => {
-    const c = center();
-    return (Math.atan2(y - c.y, x - c.x) * 180) / Math.PI;
+  /** Normalized radius on disc ellipse (0 = center, 1 = rim). */
+  const normRadius = (x, y) => {
+    const { cx, cy, rx, ry } = discMetrics();
+    const nx = (x - cx) / rx;
+    const ny = (y - cy) / ry;
+    return Math.hypot(nx, ny);
+  };
+
+  /** Hit-test: yellow circle vs black outer ring. */
+  const hitZone = (x, y) => {
+    const r = normRadius(x, y);
+    if (r > 1) return null;
+    if (r <= LABEL_HIT_R) return "label";
+    return "outer";
+  };
+
+  /**
+   * Angle of pointer around disc center (degrees).
+   * Near-center moves keep last angle so scrub feels like sliding on the
+   * yellow circle circumference — finger arc angle maps 1:1 to disc rotation.
+   */
+  const fingerAngleAt = (x, y, fallback) => {
+    const { cx, cy, rx, ry } = discMetrics();
+    const dx = x - cx;
+    const dy = y - cy;
+    const minPx = Math.min(rx, ry) * LABEL_R * 0.45;
+    if (Math.hypot(dx, dy) < minPx) return fallback;
+    return (Math.atan2(dy, dx) * 180) / Math.PI;
   };
 
   const normalizeAngle = (a) => {
@@ -436,71 +463,127 @@ function setupVinylGestures() {
     return v;
   };
 
-  const onStart = (x, y) => {
-    if (!state.currentTrack) return;
-    active = true;
+  const beginLabelScrub = (x, y) => {
+    state.isScrubbing = true;
+    els.vinylStage.classList.add("scrubbing");
+    els.vinylDisc.classList.remove("spinning");
+    els.vinylDisc.classList.add("manual-rotate");
+    scrubBaseDeg = state.currentTrack
+      ? (state.positionMs / state.currentTrack.durationMs) * 360
+      : 0;
+    scrubAccumDeg = 0;
+    lastFingerAngle = fingerAngleAt(x, y, 0);
+    els.vinylDisc.style.transform = `rotate(${scrubBaseDeg}deg)`;
+  };
+
+  const clearScrubVisual = () => {
+    els.vinylStage.classList.remove("scrubbing");
+    els.vinylDisc.classList.remove("manual-rotate");
+    state.isScrubbing = false;
+    if (state.isPlaying && state.currentTrack) {
+      els.vinylDisc.style.transform = "";
+      els.vinylDisc.classList.add("spinning");
+    }
+  };
+
+  const cancelGesture = () => {
+    if (!active || cancelled) return;
+    cancelled = true;
+    active = false;
+    if (gestureMode === "rotate" && state.currentTrack) {
+      state.positionMs = startPositionMs;
+      state.manualRotationDeg =
+        (startPositionMs / state.currentTrack.durationMs) * 360;
+      if (state.isPlaying) {
+        els.vinylDisc.style.transform = "";
+      } else {
+        els.vinylDisc.style.transform = `rotate(${state.manualRotationDeg}deg)`;
+      }
+    }
+    clearScrubVisual();
+    updateVinylRotation();
     gestureMode = null;
+    lockZone = null;
+  };
+
+  const onStart = (x, y) => {
+    const zone = hitZone(x, y);
+    if (!zone) return;
+    if (!state.currentTrack && zone === "label") return;
+
+    active = true;
+    cancelled = false;
+    lockZone = zone;
+    gestureMode = zone === "label" ? "rotate" : "swipe";
     startX = x;
     startY = y;
-    startAngle = angleAt(x, y);
     startPositionMs = state.positionMs;
-    state.isScrubbing = false;
+    scrubAccumDeg = 0;
+
+    if (zone === "label" && state.currentTrack) {
+      beginLabelScrub(x, y);
+    } else {
+      state.isScrubbing = false;
+    }
   };
 
   const onMove = (x, y) => {
-    if (!active || !state.currentTrack) return;
-    const dx = x - startX;
-    const dy = y - startY;
-    const dist = Math.hypot(dx, dy);
+    if (!active || cancelled) return;
 
-    if (!gestureMode && dist > 8) {
-      // 横向位移明显大于纵向 => 切歌；否则按转盘处理（拨动=定位）
-      gestureMode = Math.abs(dx) > Math.abs(dy) * 1.4 ? "swipe" : "rotate";
+    if (lockZone === "label") {
+      if (normRadius(x, y) > LABEL_CANCEL_R) {
+        cancelGesture();
+        return;
+      }
+    } else if (lockZone === "outer") {
+      if (hitZone(x, y) === "label") {
+        cancelGesture();
+        return;
+      }
     }
 
-    if (gestureMode === "rotate") {
-      state.isScrubbing = true;
-      els.vinylStage.classList.add("scrubbing");
-      els.vinylDisc.classList.add("manual-rotate");
-      if (state.isPlaying) {
-        pausePlayback();
-      }
+    if (gestureMode === "rotate" && state.currentTrack && lockZone === "label") {
+      const ang = fingerAngleAt(x, y, lastFingerAngle);
+      const step = normalizeAngle(ang - lastFingerAngle);
+      lastFingerAngle = ang;
+      // Finger arc along yellow circle → same angle of disc rotation
+      scrubAccumDeg += step;
 
-      const currentAngle = angleAt(x, y);
-      const deltaAngle = normalizeAngle(currentAngle - startAngle);
-      const deltaMs = (deltaAngle / 360) * state.currentTrack.durationMs;
-      const newPos = Math.max(
+      const visualDeg = scrubBaseDeg + scrubAccumDeg;
+      state.manualRotationDeg = visualDeg;
+      els.vinylDisc.style.transform = `rotate(${visualDeg}deg)`;
+
+      const deltaMs = (scrubAccumDeg / 360) * state.currentTrack.durationMs;
+      state.positionMs = Math.max(
         0,
         Math.min(startPositionMs + deltaMs, state.currentTrack.durationMs),
       );
-      state.positionMs = newPos;
-      state.manualRotationDeg = (newPos / state.currentTrack.durationMs) * 360;
-      els.vinylDisc.style.transform = `rotate(${state.manualRotationDeg}deg)`;
     }
   };
 
   const onEnd = (x) => {
+    if (cancelled) {
+      cancelled = false;
+      return;
+    }
     if (!active) return;
     const mode = gestureMode;
+    const zone = lockZone;
     active = false;
+    lockZone = null;
+    gestureMode = null;
 
-    if (mode === "swipe") {
+    if (mode === "swipe" && zone === "outer") {
       const diff = x - startX;
-      // 向左拖：回到上一首（需已搜歌且有历史）；无上一首时不响应
       if (diff < -80) {
-        if (canGoHistory(-1)) goHistory(-1, { animate: true });
-      } else if (diff > 80) {
         goNextSongLikeSwipe();
+      } else if (diff > 80) {
+        goHistory(-1, { animate: true });
       }
     } else if (mode === "rotate") {
-      els.vinylStage.classList.remove("scrubbing");
-      els.vinylDisc.classList.remove("manual-rotate");
-      state.isScrubbing = false;
+      clearScrubVisual();
       updateVinylRotation();
     }
-    // Single click: do nothing (play/pause is double-click)
-
-    gestureMode = null;
   };
 
   els.vinylStage.addEventListener("mousedown", (e) => {
@@ -609,6 +692,7 @@ function updateUI() {
     els.coverFallback.hidden = true;
   }
   els.vinylDisc.classList.toggle("empty", !state.currentTrack);
+  if (els.btnNextSong) els.btnNextSong.disabled = !state.currentTrack;
   updateVinylRotation();
   updateTonearm();
   updatePlayCount();
