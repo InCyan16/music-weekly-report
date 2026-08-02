@@ -3,13 +3,298 @@
 @import "tailwindcss/utilities";
 
 :root {
-  --font-display: "Georgia", serif;
-  --font-body: system-ui, -apple-system, sans-serif;
+  --font-display: "New York", "Iowan Old Style", "Palatino Linotype",
+    "Book Antiqua", Georgia, serif;
+  --font-body: -apple-system, BlinkMacSystemFont, "SF Pro Display",
+    "SF Pro Text", "Helvetica Neue", "PingFang SC", sans-serif;
 }
 
 body {
   @apply bg-paper text-ink font-body antialiased;
+  letter-spacing: -0.008em;
+  text-rendering: optimizeLegibility;
   background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noise)' opacity='0.04'/%3E%3C/svg%3E");
+}
+
+h1,
+h2,
+h3 {
+  font-synthesis: none;
+  text-wrap: balance;
+}
+
+button,
+input,
+textarea,
+select {
+  font: inherit;
+}
+
+.turntable-page {
+  position: relative;
+  isolation: isolate;
+  color: #f5f3ef;
+  background:
+    radial-gradient(
+      ellipse 42% 34% at 50% 47%,
+      rgba(255, 233, 204, 0.13) 0%,
+      rgba(255, 214, 170, 0.045) 38%,
+      transparent 72%
+    ),
+    radial-gradient(
+      ellipse 92% 82% at 50% 48%,
+      #181512 0%,
+      #0b0a09 58%,
+      #060605 100%
+    );
+}
+
+.turntable-page::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  pointer-events: none;
+  opacity: 0.16;
+  background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.95' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.28'/%3E%3C/svg%3E");
+  background-size: 160px 160px;
+}
+
+.turntable-page .text-ink {
+  color: #f5f3ef;
+}
+
+.turntable-page .text-ink-muted {
+  color: rgba(245, 243, 239, 0.58);
+}
+
+.turntable-page .text-ink-light {
+  color: rgba(245, 243, 239, 0.38);
+}
+
+.vinyl-environment-light {
+  z-index: 8;
+}
+
+.vinyl-environment-base {
+  background:
+    linear-gradient(
+      142deg,
+      rgba(255, 250, 242, 0.1) 0%,
+      transparent 27%,
+      transparent 68%,
+      rgba(0, 0, 0, 0.24) 100%
+    ),
+    radial-gradient(
+      ellipse 66% 42% at 26% 19%,
+      rgba(255, 249, 238, 0.2) 0%,
+      transparent 57%
+    ),
+    radial-gradient(
+      ellipse 48% 38% at 76% 82%,
+      rgba(0, 0, 0, 0.32) 0%,
+      transparent 54%
+    );
+}
+
+.vinyl-reflection-wide,
+.vinyl-reflection-fine {
+  opacity: 0;
+  mix-blend-mode: screen;
+  will-change: transform, opacity;
+}
+
+.vinyl-reflection-wide {
+  inset: -22%;
+  background: conic-gradient(
+    from 205deg,
+    transparent 0deg 36deg,
+    rgba(255, 255, 255, 0.015) 48deg,
+    rgba(255, 255, 255, 0.19) 66deg,
+    rgba(255, 255, 255, 0.025) 91deg,
+    transparent 112deg 360deg
+  );
+}
+
+.vinyl-reflection-fine {
+  inset: -7%;
+  background: conic-gradient(
+    from 18deg,
+    transparent 0deg 148deg,
+    rgba(255, 255, 255, 0.12) 158deg,
+    transparent 162deg 296deg,
+    rgba(255, 255, 255, 0.07) 302deg,
+    transparent 307deg 360deg
+  );
+}
+
+.vinyl-environment-light.is-active .vinyl-reflection-wide {
+  animation: vinyl-reflection-wide 8.6s ease-in-out infinite alternate;
+}
+
+.vinyl-environment-light.is-active .vinyl-reflection-fine {
+  animation: vinyl-reflection-fine 11.8s ease-in-out infinite alternate;
+}
+
+.vinyl-environment-bevel {
+  box-shadow:
+    inset 0 1px 2px rgba(255, 255, 255, 0.11),
+    inset 0 -2px 5px rgba(0, 0, 0, 0.42);
+}
+
+@keyframes vinyl-reflection-wide {
+  0% {
+    opacity: 0.18;
+    transform: rotate(-8deg) scale(1.02);
+  }
+  45% {
+    opacity: 0.34;
+  }
+  100% {
+    opacity: 0.22;
+    transform: rotate(18deg) scale(1.06);
+  }
+}
+
+@keyframes vinyl-reflection-fine {
+  0% {
+    opacity: 0.08;
+    transform: rotate(5deg);
+  }
+  55% {
+    opacity: 0.2;
+  }
+  100% {
+    opacity: 0.11;
+    transform: rotate(-13deg);
+  }
+}
+
+.turntable-tonearm {
+  position: absolute;
+  top: 1%;
+  right: -1%;
+  z-index: 20;
+  width: 35%;
+  height: 94%;
+  pointer-events: none;
+  filter: drop-shadow(0 9px 10px rgba(0, 0, 0, 0.48));
+}
+
+.turntable-tonearm-plinth {
+  position: absolute;
+  top: 0;
+  right: 2%;
+  width: 24%;
+  aspect-ratio: 1;
+  border-radius: 50%;
+  background:
+    radial-gradient(circle at 42% 28%, rgba(255, 255, 255, 0.2) 0%, transparent 22%),
+    radial-gradient(circle at 44% 36%, #666 0%, #343434 47%, #121212 74%, #080808 100%);
+  box-shadow:
+    inset 0 1px 2px rgba(255, 255, 255, 0.28),
+    inset 0 -3px 7px rgba(0, 0, 0, 0.62),
+    0 7px 14px rgba(0, 0, 0, 0.52);
+}
+
+.turntable-tonearm-pivot {
+  position: absolute;
+  inset: 5% 7% 0 0;
+  transform: rotate(13deg);
+  transform-origin: 91% 8%;
+  transition: transform 0.82s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.turntable-stage.is-playing .turntable-tonearm-pivot {
+  transform: rotate(-25deg);
+}
+
+.turntable-tonearm-counterweight {
+  position: absolute;
+  top: -1%;
+  right: -1%;
+  width: 18%;
+  height: 12%;
+  border-radius: 44%;
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.32), transparent 35%),
+    linear-gradient(105deg, #909090, #4a4a4a 48%, #1d1d1d);
+  box-shadow:
+    inset 0 1px 1px rgba(255, 255, 255, 0.36),
+    0 3px 6px rgba(0, 0, 0, 0.42);
+}
+
+.turntable-tonearm-beam {
+  position: absolute;
+  top: 7%;
+  right: 12%;
+  width: 80%;
+  height: 2.8%;
+  border-radius: 999px;
+  transform: rotate(-8deg);
+  transform-origin: right center;
+  background: linear-gradient(180deg, #f0f0ee 0%, #bdbdbb 28%, #777 67%, #303030 100%);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.38),
+    0 3px 5px rgba(0, 0, 0, 0.46);
+}
+
+.turntable-tonearm-headshell {
+  position: absolute;
+  left: -2%;
+  top: 50%;
+  width: 18%;
+  height: 230%;
+  transform: translateY(-50%) rotate(-11deg);
+  border-radius: 3px 6px 6px 3px;
+  background: linear-gradient(150deg, #d5d1c8 0%, #8e8980 44%, #393733 100%);
+  box-shadow:
+    inset 0 1px 1px rgba(255, 255, 255, 0.34),
+    0 3px 6px rgba(0, 0, 0, 0.44);
+}
+
+.turntable-tonearm-cartridge {
+  position: absolute;
+  left: 8%;
+  bottom: -10%;
+  width: 72%;
+  height: 56%;
+  border-radius: 2px;
+  background: linear-gradient(180deg, #292929, #090909);
+}
+
+.turntable-tonearm-stylus {
+  position: absolute;
+  left: 39%;
+  bottom: -44%;
+  width: 8%;
+  height: 50%;
+  border-radius: 1px;
+  transform: rotate(-16deg);
+  transform-origin: top center;
+  background: linear-gradient(180deg, #ddd, #888 60%, #222);
+  transition:
+    transform 0.5s cubic-bezier(0.16, 1, 0.3, 1),
+    opacity 0.35s ease;
+}
+
+.turntable-stage.is-playing .turntable-tonearm-stylus {
+  transform: rotate(7deg) translateY(2px);
+}
+
+@media (max-width: 600px) {
+  .turntable-page {
+    padding-inline: 20px;
+  }
+
+  .turntable-tonearm {
+    right: 8%;
+  }
+}
+
+:focus-visible {
+  outline: 2px solid currentColor;
+  outline-offset: 4px;
 }
 
 @layer utilities {
@@ -25,5 +310,157 @@ body {
     animation-duration: 0.01ms !important;
     animation-iteration-count: 1 !important;
     transition-duration: 0.01ms !important;
+  }
+
+  .vinyl-reflection-wide,
+  .vinyl-reflection-fine {
+    animation: none !important;
+    opacity: 0.12;
+  }
+}
+
+/* Hardware tonearm: weighted pivot with a bent metal arm */
+
+.turntable-tonearm-plinth {
+  width: 27%;
+  background:
+    radial-gradient(circle at 42% 30%, #c4c4c2 0%, #81817f 16%, #3b3b3b 17%, #222 48%, #090909 74%),
+    radial-gradient(circle at 44% 36%, #666 0%, #343434 47%, #121212 74%, #080808 100%);
+  box-shadow:
+    inset 0 2px 3px rgba(255, 255, 255, 0.32),
+    inset 0 -4px 8px rgba(0, 0, 0, 0.68),
+    0 8px 18px rgba(0, 0, 0, 0.58),
+    0 0 0 5px rgba(20, 20, 20, 0.82);
+}
+
+.turntable-tonearm-counterweight {
+  right: -3%;
+  top: -2%;
+  width: 20%;
+  height: 14%;
+}
+
+.turntable-tonearm-beam {
+  right: 9%;
+  top: 7%;
+  width: 80%;
+  height: 63%;
+  border-radius: 0;
+  transform: none;
+  background: none;
+  box-shadow: none;
+}
+
+.turntable-tonearm-beam::before {
+  content: "";
+  position: absolute;
+  top: 0;
+  right: 0;
+  width: 5%;
+  height: 100%;
+  border-radius: 999px;
+  background: linear-gradient(90deg, #555 0%, #f0f0ee 32%, #bababa 58%, #454545 100%);
+  box-shadow:
+    3px 4px 7px rgba(0, 0, 0, 0.48),
+    inset 1px 0 0 rgba(255, 255, 255, 0.48);
+}
+
+.turntable-tonearm-beam::after {
+  content: "";
+  position: absolute;
+  right: 1.5%;
+  bottom: 0;
+  width: 100%;
+  height: 5%;
+  border-radius: 999px 0 0 999px;
+  background: linear-gradient(180deg, #f0f0ee 0%, #bdbdbb 32%, #777 68%, #343434 100%);
+  box-shadow:
+    0 4px 7px rgba(0, 0, 0, 0.48),
+    inset 0 1px 0 rgba(255, 255, 255, 0.44);
+}
+
+.turntable-tonearm-headshell {
+  left: -5%;
+  top: 100%;
+  width: 22%;
+  height: 10%;
+  transform: translateY(-48%) rotate(-8deg);
+  border-radius: 5px 9px 9px 4px;
+}
+
+.turntable-tonearm-cartridge {
+  left: 6%;
+  bottom: -42%;
+  width: 72%;
+  height: 72%;
+}
+
+.turntable-tonearm-stylus {
+  left: 40%;
+  bottom: -96%;
+  width: 7%;
+  height: 74%;
+}
+
+.turntable-tonearm-pivot {
+  transform: rotate(-8deg);
+}
+
+.turntable-stage.is-playing .turntable-tonearm-pivot {
+  transform: rotate(18deg);
+}
+
+/* Layered photorealistic tonearm assets */
+
+.turntable-tonearm {
+  top: -2%;
+  right: -2%;
+  width: 45%;
+  height: 100%;
+  filter: none;
+}
+
+.turntable-tonearm-base-asset {
+  position: absolute;
+  top: 0;
+  right: -6.5%;
+  width: 45%;
+  height: auto;
+  user-select: none;
+  pointer-events: none;
+  filter: drop-shadow(0 10px 12px rgba(0, 0, 0, 0.48));
+}
+
+.turntable-tonearm-pivot {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  transform-origin: 84% 16.5%;
+  transform: rotate(-5deg);
+  transition: transform 0.88s cubic-bezier(0.16, 1, 0.3, 1);
+  filter: none;
+}
+
+.turntable-stage.is-playing .turntable-tonearm-pivot {
+  transform: rotate(28deg);
+}
+
+.turntable-tonearm-arm-asset {
+  position: absolute;
+  top: 8.5%;
+  right: 6%;
+  width: 62%;
+  height: auto;
+  user-select: none;
+  pointer-events: none;
+  filter: drop-shadow(0 8px 8px rgba(0, 0, 0, 0.44));
+}
+
+@media (max-width: 600px) {
+  .turntable-tonearm {
+    right: 22%;
+    top: -1%;
+    width: 48%;
   }
 }

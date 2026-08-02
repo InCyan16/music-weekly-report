@@ -84,11 +84,11 @@ export function MusicSearch({
   }
 
   return (
-    <div className="relative mx-auto w-[65vw]">
+    <div className="relative mx-auto w-[min(65vw,420px)]">
       <label htmlFor="music-search" className="sr-only">
         搜索音乐
       </label>
-      <div className="flex items-center gap-3 rounded-full border-[1.5px] border-white/70 bg-white/55 px-6 py-[11px] backdrop-blur-xl focus-within:border-accent/60 focus-within:ring-1 focus-within:ring-accent/40">
+      <div className="flex items-center gap-3 rounded-full border border-white/20 bg-white/[0.065] px-6 py-[11px] shadow-[inset_0_1px_0_rgba(255,255,255,0.12),0_10px_32px_rgba(0,0,0,0.14)] backdrop-blur-2xl focus-within:border-white/35 focus-within:bg-white/[0.09] focus-within:ring-2 focus-within:ring-white/[0.04]">
         <input
           ref={inputRef}
           id="music-search"
@@ -98,12 +98,10 @@ export function MusicSearch({
           onKeyDown={handleKeyDown}
           onFocus={() => results.length > 0 && setIsOpen(true)}
           placeholder=""
-          className="min-w-0 flex-1 border-none bg-transparent text-[17px] font-semibold text-ink outline-none"
+          className="min-w-0 flex-1 border-none bg-transparent text-[16px] font-medium text-white outline-none"
           autoComplete="off"
         />
-        <span className="shrink-0 text-[22px] opacity-45" aria-hidden>
-          🔍
-        </span>
+        <span className="shrink-0 text-lg text-white/40" aria-hidden>⌕</span>
       </div>
 
       {loading && (
@@ -118,7 +116,7 @@ export function MusicSearch({
 
       {isOpen && (
         <ul
-          className="absolute z-50 mt-2 max-h-80 w-full overflow-auto rounded-xl border border-paper-dark bg-white shadow-lg"
+          className="absolute z-50 mt-2 max-h-80 w-full overflow-auto rounded-2xl border border-white/15 bg-[#1b1815]/90 text-white shadow-[0_22px_60px_rgba(0,0,0,0.5)] backdrop-blur-2xl"
           role="listbox"
         >
           {loading && results.length === 0 && (
@@ -149,8 +147,8 @@ export function MusicSearch({
                 role="option"
                 aria-selected={index === selectedIndex}
                 className={cn(
-                  "flex cursor-pointer items-center gap-3 px-4 py-3 transition-colors hover:bg-paper",
-                  index === selectedIndex && "bg-paper",
+                  "flex cursor-pointer items-center gap-3 px-4 py-3 transition-colors hover:bg-white/[0.07]",
+                  index === selectedIndex && "bg-white/[0.07]",
                   !track.playable && "opacity-50",
                 )}
                 onClick={() => handleSelect(track)}
@@ -171,15 +169,15 @@ export function MusicSearch({
                   )}
                 </div>
                 <div className="min-w-0 flex-1">
-                  <p className="truncate font-medium text-ink">
+                  <p className="truncate font-medium text-white">
                     {track.title}
                   </p>
-                  <p className="truncate text-sm text-ink-muted">
+                  <p className="truncate text-sm text-white/55">
                     {track.artist}
                     {track.album && ` · ${track.album}`}
                   </p>
                 </div>
-                <span className="text-xs text-ink-light">
+                <span className="text-xs text-white/35">
                   {formatDuration(track.durationMs)}
                 </span>
                 {!track.playable && (

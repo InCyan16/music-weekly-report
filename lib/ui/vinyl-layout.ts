@@ -3,7 +3,7 @@ export const VINYL_SCENE = {
   heightRatio: 0.72,
   widthRatio: 1.22,
   /** 顶栏 + 标题 + 搜索 + 底部按钮/圆点 + 曲名 */
-  reservedPx: 340,
+  reservedPx: 330,
   minDisc: 220,
 } as const;
 
