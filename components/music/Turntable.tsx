@@ -32,6 +32,7 @@ type TurntableProps = {
   onTogglePlay?: () => void;
   onSwipeLeft?: () => void;
   onSwipeRight?: () => void;
+  discSize?: number;
   children?: React.ReactNode;
 };
 
@@ -52,9 +53,11 @@ export function Turntable({
   onTogglePlay,
   onSwipeLeft,
   onSwipeRight,
+  discSize: fixedDiscSize,
   children,
 }: TurntableProps) {
-  const discSize = useDiscSize();
+  const responsiveDiscSize = useDiscSize();
+  const discSize = fixedDiscSize ?? responsiveDiscSize;
   const stageWidth = calcSceneWidth(discSize);
   const stageHeight = calcSceneHeight(discSize);
   const stageRef = useRef<HTMLDivElement>(null);

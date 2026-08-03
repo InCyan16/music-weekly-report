@@ -69,15 +69,18 @@ export function MoodPicker() {
   });
 
   const full = slots.length >= SLOT_MAX;
+  const canClose = slots.length > 0;
 
   const addSlot = useCallback((label: MoodLabel) => {
     setSlots((prev) => (prev.length >= SLOT_MAX ? prev : [...prev, label]));
   }, []);
 
+  const removeSlot = useCallback((index: number) => {
+    setSlots((prev) => prev.filter((_, slotIndex) => slotIndex !== index));
+  }, []);
+
   const goNext = () => {
-    const now = new Date();
-    if (now.getDay() === 0) router.push("/reports");
-    else router.push("/week");
+    router.push("/today/summary");
   };
 
   async function handleContinue() {
@@ -93,8 +96,7 @@ export function MoodPicker() {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          moodScore: primary.score,
-          moodLabel: primary.label,
+          moodSlots: slots,
         }),
       });
       if (!res.ok) throw new Error("保存失败");
@@ -196,9 +198,9 @@ export function MoodPicker() {
           </h1>
           <p className="mood-subtitle">Drag your feeling into the music box</p>
         </div>
-        <button type="button" className="mood-skip" onClick={goNext}>
-          SKIP →
-        </button>
+        <span className="mood-skip" aria-hidden>
+          1–5 RECORDS
+        </span>
       </header>
 
       <div className="mood-workspace">
@@ -223,7 +225,7 @@ export function MoodPicker() {
           className={cn(
             "mood-box-stage",
             slots.length > 0 && "has-slots",
-            full && "is-ready",
+            canClose && "is-ready",
           )}
         >
           <div className="mood-drag-hint" aria-hidden />
@@ -250,7 +252,7 @@ export function MoodPicker() {
                   } as React.CSSProperties
                 }
                 onPointerDown={(e) => {
-                  if (!full || phase !== "picking") return;
+                  if (!canClose || phase !== "picking") return;
                   e.preventDefault();
                   lidDrag.current = { active: true, startY: e.clientY };
                   setLidDragging(true);
@@ -271,6 +273,11 @@ export function MoodPicker() {
                 </div>
               </div>
 
+              <div className="music-box-hinges" aria-hidden>
+                <i />
+                <i />
+              </div>
+
               <div className="music-box-cavity">
                 <div className="music-box-cavity-shade" aria-hidden />
                 <div className="music-box-slots">
@@ -280,9 +287,12 @@ export function MoodPicker() {
                     </div>
                   ) : (
                     slots.map((label, i) => (
-                      <div
+                      <button
+                        type="button"
                         key={`${label}-${i}`}
                         className="mood-slot filled"
+                        aria-label={`Remove ${label} mood`}
+                        onClick={() => removeSlot(i)}
                         style={
                           {
                             ["--sx" as string]: `${SLOT_SPREADS[i] ?? (i - 2) * 14}px`,
@@ -292,7 +302,7 @@ export function MoodPicker() {
                         }
                       >
                         <MiniVinyl label={label} size="box" />
-                      </div>
+                      </button>
                     ))
                   )}
                 </div>
@@ -316,11 +326,13 @@ export function MoodPicker() {
             </div>
           </div>
 
-          <p className={cn("mood-lid-hint", full && "ready")}>
-            {full
-              ? "Slide the lid closed to seal today's feelings"
-              : "Fill 5 slots, then slide the lid closed"}
-          </p>
+          {phase === "picking" ? (
+            <p className={cn("mood-lid-hint", canClose && "ready")}>
+              {canClose
+                ? "Slide the lid closed to seal today's feelings"
+                : "Drop 1–5 feelings into the box"}
+            </p>
+          ) : null}
           {error ? <p className="mt-2 text-sm text-red-400">{error}</p> : null}
         </div>
       </div>
@@ -347,15 +359,13 @@ export function MoodPicker() {
 
       {phase === "complete" ? (
         <div className="mood-complete">
-          <h2>Feelings boxed.</h2>
-          <p>Your mood for today is sealed in the music box.</p>
           <button
             type="button"
             disabled={saving}
             onClick={handleContinue}
             className="rounded-full border border-white/20 bg-white/10 px-8 py-3 text-sm font-semibold backdrop-blur hover:bg-white/15 disabled:opacity-50"
           >
-            {saving ? "Saving…" : "Continue"}
+            {saving ? "Saving…" : "Enter Today’s Report"}
           </button>
         </div>
       ) : null}

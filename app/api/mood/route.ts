@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { moodSchema } from "@/lib/validation/schemas";
 import { getTodayLocalDate } from "@/lib/dates/timezone";
+import { primaryMoodFromSlots, type MoodLabel } from "@/lib/music/types";
 
 export async function POST(request: NextRequest) {
   const supabase = await createClient();
@@ -27,6 +28,15 @@ export async function POST(request: NextRequest) {
 
   const timezone = profile?.timezone || "UTC";
   const localDate = getTodayLocalDate(timezone);
+  const moodSlots: MoodLabel[] =
+    "moodSlots" in parsed.data
+      ? parsed.data.moodSlots
+      : [parsed.data.moodLabel];
+  const primaryMood = primaryMoodFromSlots(moodSlots);
+
+  if (!primaryMood) {
+    return NextResponse.json({ error: "至少选择一种心情" }, { status: 400 });
+  }
 
   const { data, error } = await supabase
     .from("daily_moods")
@@ -34,8 +44,9 @@ export async function POST(request: NextRequest) {
       {
         user_id: user.id,
         local_date: localDate,
-        mood_score: parsed.data.moodScore,
-        mood_label: parsed.data.moodLabel,
+        mood_score: primaryMood.score,
+        mood_label: primaryMood.label,
+        mood_slots: moodSlots,
       },
       { onConflict: "user_id,local_date" },
     )
@@ -46,5 +57,5 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: "保存心情失败" }, { status: 500 });
   }
 
-  return NextResponse.json({ mood: data });
+  return NextResponse.json({ mood: data, moodSlots });
 }

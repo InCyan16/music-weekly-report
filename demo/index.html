@@ -4,7 +4,7 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Music Diary · Demo</title>
-  <link rel="stylesheet" href="styles.css" />
+  <link rel="stylesheet" href="styles.css?v=music-box-7" />
 </head>
 <body>
   <div id="app">
@@ -157,7 +157,7 @@
           <h1 class="mood-title">How did today's music make you feel?</h1>
           <p class="mood-subtitle">Drag your feeling into the music box</p>
         </div>
-        <button type="button" class="mood-skip" id="btn-mood-skip">SKIP →</button>
+        <span class="mood-skip" aria-hidden="true">1–5 RECORDS</span>
       </header>
 
       <div class="mood-workspace">
@@ -179,6 +179,7 @@
                   <div class="music-box-lid-rules" aria-hidden="true"></div>
                 </div>
               </div>
+              <div class="music-box-hinges" aria-hidden="true"><i></i><i></i></div>
               <div class="music-box-cavity">
                 <div class="music-box-cavity-shade" aria-hidden="true"></div>
                 <div class="music-box-slots" id="mood-box-slots"></div>
@@ -200,7 +201,7 @@
               </div>
             </div>
           </div>
-          <p class="mood-lid-hint" id="mood-lid-hint">Fill 5 slots, then slide the lid closed</p>
+          <p class="mood-lid-hint" id="mood-lid-hint">Drop 1–5 feelings into the box</p>
         </div>
       </div>
 
@@ -212,34 +213,51 @@
       </div>
 
       <div id="mood-complete" class="mood-complete hidden">
-        <h2>Feelings boxed.</h2>
-        <p>Your mood for today is sealed in the music box.</p>
-        <button type="button" id="btn-mood-continue" class="pill-btn primary">Continue</button>
+        <button type="button" id="btn-mood-continue" class="pill-btn primary">Enter Today’s Report</button>
       </div>
 
       <div id="mood-drag-ghost" class="mood-drag-ghost hidden" aria-hidden="true"></div>
     </section>
 
-    <!-- Screen: Report -->
-    <section id="screen-report" class="screen">
-      <button class="back-btn" data-go="today">← Back to listening</button>
-      <h1 class="main-question report-title">Weekly music report</h1>
-      <p class="week-range" id="week-range"></p>
-
-      <div class="report-layout">
-        <div class="report-vinyls" id="report-vinyls"></div>
-        <div class="turntable-img">
-          <div class="turntable-body">
-            <div class="tt-platter"></div>
-            <div class="tt-arm"></div>
-            <div class="tt-lid"></div>
+    <!-- Screen: Daily Collection -->
+    <section id="screen-summary" class="screen collection-screen">
+      <div class="collection-cabinet">
+        <header class="collection-header">
+          <div>
+            <p class="collection-kicker">Daily music archive</p>
+            <h1>Today’s Collection</h1>
           </div>
-        </div>
-        <div class="mood-stats" id="mood-stats"></div>
-      </div>
+          <p class="collection-date" id="collection-date"></p>
+          <div class="collection-dial" aria-hidden="true"></div>
+        </header>
 
-      <div class="top5-list" id="top5-list"></div>
-      <button id="btn-share" class="pill-btn primary wide">Save share image</button>
+        <div class="collection-shelf-frame">
+          <div class="collection-grid" id="collection-grid" aria-label="Today’s records"></div>
+        </div>
+
+        <footer class="collection-console">
+          <div class="collection-meta">
+            <button class="collection-back" data-go="today">← Back to listening</button>
+            <div class="collection-moods" id="collection-moods" aria-label="Today’s feelings"></div>
+          </div>
+
+          <div class="collection-player" id="collection-player" role="button" tabindex="0" aria-label="Play mounted record">
+            <div class="summary-turntable">
+              <div class="summary-platter">
+                <div class="summary-disc" id="summary-disc">
+                  <div class="summary-disc-grooves"></div>
+                  <div class="summary-disc-label" id="summary-disc-label"></div>
+                </div>
+              </div>
+              <div class="summary-tonearm" aria-hidden="true"></div>
+            </div>
+            <div class="summary-track-copy">
+              <strong id="summary-track-title">Select a record</strong>
+              <span id="summary-track-artist">Click a record on the shelf to mount it</span>
+            </div>
+          </div>
+        </footer>
+      </div>
     </section>
 
     <!-- Confirm modal -->
@@ -258,6 +276,6 @@
   </div>
 
   <canvas id="share-canvas" hidden></canvas>
-  <script src="app.js"></script>
+  <script src="app.js?v=music-box-7"></script>
 </body>
 </html>

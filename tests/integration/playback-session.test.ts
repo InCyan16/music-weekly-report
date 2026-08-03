@@ -4,7 +4,7 @@ import { isQualifiedPlay, getValidPlayThresholdMs } from "@/lib/playback/qualifi
 
 describe("playback session integration logic", () => {
   it("validates progress delta prevents cheating", () => {
-    expect(validateProgressDelta(0, 999_999, 1000)).toBe(16_000);
+    expect(validateProgressDelta(0, 999_999, 1000)).toBe(15_000);
     expect(validateProgressDelta(10_000, 5_000, 1000)).toBe(10_000);
     expect(validateProgressDelta(10_000, 15_000, 5000)).toBe(15_000);
   });

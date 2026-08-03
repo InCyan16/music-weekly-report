@@ -13,7 +13,9 @@ export function getWeekStart(date: Date, timezone: string): string {
 
 export function getWeekEnd(weekStart: string, timezone: string): string {
   const [year, month, day] = weekStart.split("-").map(Number);
-  const start = new Date(year, month - 1, day);
+  // Noon UTC avoids the host machine timezone shifting a date-only value
+  // backward when it is formatted in UTC or another western timezone.
+  const start = new Date(Date.UTC(year, month - 1, day, 12));
   const sunday = new Date(start);
   sunday.setDate(sunday.getDate() + 6);
   return getLocalDateString(sunday, timezone);

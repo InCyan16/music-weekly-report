@@ -72,10 +72,12 @@ const state = {
   lastPlayStart: null,
   qualified: false,
   validPlays: [],    // { sessionId, trackId, track, listenedAt }
+  selections: [],    // { track, selectedAt } — clicks from search results
   mood: null,
   selectedMood: null,
   moodSlots: [],
   moodPhase: "picking", // picking | complete
+  summaryTrack: null,
   manualRotationDeg: 0,
   isScrubbing: false,
 };
@@ -171,11 +173,14 @@ const els = {
   moodDate: $("#mood-date"),
   btnMoodSkip: $("#btn-mood-skip"),
   btnMoodContinue: $("#btn-mood-continue"),
-  weekRange: $("#week-range"),
-  reportVinyls: $("#report-vinyls"),
-  moodStats: $("#mood-stats"),
-  top5List: $("#top5-list"),
-  btnShare: $("#btn-share"),
+  collectionDate: $("#collection-date"),
+  collectionGrid: $("#collection-grid"),
+  collectionMoods: $("#collection-moods"),
+  collectionPlayer: $("#collection-player"),
+  summaryDisc: $("#summary-disc"),
+  summaryDiscLabel: $("#summary-disc-label"),
+  summaryTrackTitle: $("#summary-track-title"),
+  summaryTrackArtist: $("#summary-track-artist"),
   modal: $("#modal"),
   modalText: $("#modal-text"),
   modalCancel: $("#modal-cancel"),
@@ -193,13 +198,20 @@ function init() {
   bindEvents();
   updateUI();
   updateWeekDots();
-  renderReport();
+  renderDailyCollection();
 }
 
 function loadState() {
   try {
     const saved = JSON.parse(localStorage.getItem(STORAGE_KEY) || "{}");
     if (saved.validPlays) state.validPlays = saved.validPlays;
+    if (Array.isArray(saved.selections)) state.selections = saved.selections;
+    if (!state.selections.length && state.validPlays.length) {
+      state.selections = state.validPlays.map((play) => ({
+        track: play.track,
+        selectedAt: play.listenedAt,
+      }));
+    }
     if (saved.mood) state.mood = saved.mood;
     if (Array.isArray(saved.moodSlots)) state.moodSlots = saved.moodSlots.slice(0, MOOD_SLOT_MAX);
   } catch { /* ignore */ }
@@ -208,6 +220,7 @@ function loadState() {
 function saveState() {
   localStorage.setItem(STORAGE_KEY, JSON.stringify({
     validPlays: state.validPlays,
+    selections: state.selections,
     mood: state.mood,
     moodSlots: state.moodSlots,
   }));
@@ -218,7 +231,7 @@ function showScreen(name) {
   $$(".screen").forEach((s) => s.classList.remove("active"));
   $(`#screen-${name}`).classList.add("active");
   if (name === "mood") renderMoodPicker();
-  if (name === "report") renderReport();
+  if (name === "summary") renderDailyCollection();
 }
 
 /** 与向左拖相同：有后续历史则前进，否则（最新一首）出空白碟 */
@@ -286,7 +299,7 @@ function renderSearchResults(tracks) {
 }
 
 // ─── Playback ────────────────────────────────────────────
-function playTrack(track, { appendHistory = true } = {}) {
+function playTrack(track, { appendHistory = true, recordSelection = true } = {}) {
   const fromBlank = !state.currentTrack;
   endCurrentSession("changed_track");
   state.currentTrack = track;
@@ -306,6 +319,10 @@ function playTrack(track, { appendHistory = true } = {}) {
       qualified: false,
     });
     state.historyIndex = state.history.length - 1;
+  }
+  if (recordSelection) {
+    state.selections.push({ track, selectedAt: new Date().toISOString() });
+    saveState();
   }
 
   const audio = getAudio();
@@ -346,6 +363,7 @@ function startPlayback() {
       playPromise.catch(() => { /* autoplay / missing file */ });
     }
   }
+  updateSummaryPlayer();
 }
 
 function pausePlayback() {
@@ -365,6 +383,7 @@ function pausePlayback() {
     : "";
   updateTonearm();
   checkQualify();
+  updateSummaryPlayer();
 }
 
 function updateTonearm() {
@@ -401,6 +420,7 @@ function startTick() {
       }
     }
     checkQualify();
+    updateSummaryPlayer();
   }, 250);
 }
 
@@ -420,6 +440,7 @@ function seek(ms) {
   state.positionMs = Math.max(0, Math.min(ms, dur || ms));
   syncAudioToPosition();
   updateVinylRotation();
+  updateSummaryPlayer();
 }
 
 function updateVinylRotation() {
@@ -954,9 +975,9 @@ function renderMoodBoxSlots() {
     const r = tilts[i] ?? (i - 2) * 6;
     const z = 10 + i;
     return `
-      <div class="mood-slot filled" style="--sx:${x}px;--sr:${r}deg;--sz:${z}">
+      <button type="button" class="mood-slot filled" data-slot-index="${i}" aria-label="Remove ${label} mood" style="--sx:${x}px;--sr:${r}deg;--sz:${z}">
         ${moodMiniVinylHtml(label, "", { size: "box" })}
-      </div>`;
+      </button>`;
   });
   if (!n) {
     cells.push('<div class="mood-slot-placeholder">Drop feelings here</div>');
@@ -969,11 +990,11 @@ function updateMoodBoxChrome() {
   const n = state.moodSlots.length;
   if (els.moodBoxCount) els.moodBoxCount.textContent = `${n} / ${MOOD_SLOT_MAX}`;
   if (els.moodLidHint) {
-    els.moodLidHint.textContent =
-      n >= MOOD_SLOT_MAX
-        ? "Slide the lid closed to seal today's feelings"
-        : "Fill 5 slots, then slide the lid closed";
-    els.moodLidHint.classList.toggle("ready", n >= MOOD_SLOT_MAX);
+    els.moodLidHint.classList.toggle("hidden", state.moodPhase === "complete");
+    els.moodLidHint.textContent = n > 0
+      ? "Slide the lid closed to seal today's feelings"
+      : "Drop 1–5 feelings into the box";
+    els.moodLidHint.classList.toggle("ready", n > 0);
   }
   if (els.moodBox) {
     els.moodBox.classList.toggle("is-full", n >= MOOD_SLOT_MAX);
@@ -981,7 +1002,7 @@ function updateMoodBoxChrome() {
   }
   const stage = els.moodBox?.closest(".mood-box-stage");
   stage?.classList.toggle("has-slots", n > 0);
-  stage?.classList.toggle("is-ready", n >= MOOD_SLOT_MAX);
+  stage?.classList.toggle("is-ready", n > 0);
 }
 
 function addMoodSlot(label) {
@@ -994,7 +1015,7 @@ function addMoodSlot(label) {
 }
 
 function sealMoodBox() {
-  if (state.moodSlots.length < MOOD_SLOT_MAX) return;
+  if (state.moodSlots.length < 1) return;
   const primary = primaryMoodFromSlots(state.moodSlots);
   if (!primary) return;
   state.selectedMood = primary;
@@ -1007,13 +1028,8 @@ function sealMoodBox() {
   state.moodPhase = "complete";
   saveState();
   if (els.moodBox) els.moodBox.dataset.lid = "closed";
+  if (els.moodLidHint) els.moodLidHint.classList.add("hidden");
   if (els.moodComplete) els.moodComplete.classList.remove("hidden");
-}
-
-function skipMood() {
-  state.moodPhase = "picking";
-  state.moodSlots = [];
-  showScreen("report");
 }
 
 function setupMoodDrag() {
@@ -1074,6 +1090,17 @@ function setupMoodDrag() {
     startDrag(item.dataset.label, e.clientX, e.clientY);
   });
 
+  els.moodBoxSlots?.addEventListener("click", (e) => {
+    if (state.moodPhase !== "picking") return;
+    const slot = e.target.closest("[data-slot-index]");
+    if (!slot) return;
+    const index = Number(slot.dataset.slotIndex);
+    if (!Number.isInteger(index)) return;
+    state.moodSlots.splice(index, 1);
+    renderMoodBoxSlots();
+    updateMoodBoxChrome();
+  });
+
   window.addEventListener("pointermove", (e) => {
     if (!dragging) return;
     if (Math.hypot(e.clientX - startX, e.clientY - startY) > 8) dragMoved = true;
@@ -1089,7 +1116,7 @@ function setupMoodDrag() {
   let lidDelta = 0;
 
   els.moodBoxLid?.addEventListener("pointerdown", (e) => {
-    if (state.moodSlots.length < MOOD_SLOT_MAX || state.moodPhase !== "picking") return;
+    if (state.moodSlots.length < 1 || state.moodPhase !== "picking") return;
     lidDragging = true;
     lidStartY = e.clientY;
     lidDelta = 0;
@@ -1114,7 +1141,185 @@ function setupMoodDrag() {
   });
 }
 
-// ─── Report ──────────────────────────────────────────────
+// ─── Daily collection ───────────────────────────────────
+function getTodayCollection() {
+  const today = localISODate();
+  const seen = new Set();
+  const tracks = [];
+  for (const selection of state.selections) {
+    if (!selection?.track || !selection.selectedAt) continue;
+    if (localISODate(new Date(selection.selectedAt)) !== today) continue;
+    if (seen.has(selection.track.id)) continue;
+    seen.add(selection.track.id);
+    tracks.push(selection.track);
+    if (tracks.length >= 8) break;
+  }
+  return tracks;
+}
+
+function collectionRecordHtml(track, selected) {
+  const labelStyle = track.coverUrl
+    ? `background-image:url('${track.coverUrl}')`
+    : `background:linear-gradient(145deg, ${track.color || "#d4843a"}, #2a2018)`;
+  return `
+    <button type="button" class="collection-record${selected ? " is-selected" : ""}" data-track-id="${track.id}" aria-pressed="${selected}" title="${track.title} — ${track.artist}">
+      <span class="collection-vinyl">
+        <span class="collection-vinyl-grooves"></span>
+        <span class="collection-vinyl-label" style="${labelStyle}"></span>
+      </span>
+    </button>`;
+}
+
+function renderDailyCollection() {
+  if (!els.collectionGrid) return;
+  const tracks = getTodayCollection();
+  if (!state.summaryTrack || !tracks.some((track) => track.id === state.summaryTrack.id)) {
+    state.summaryTrack = tracks[0] || null;
+  }
+
+  if (els.collectionDate) {
+    els.collectionDate.textContent = new Date().toLocaleDateString("en-US", {
+      year: "numeric", month: "long", day: "numeric",
+    });
+  }
+
+  els.collectionGrid.innerHTML = Array.from({ length: 8 }, (_, index) => {
+    const track = tracks[index];
+    return `
+      <div class="collection-slot">
+        ${track ? collectionRecordHtml(track, track.id === state.summaryTrack?.id) : '<div class="collection-empty" aria-hidden="true"></div>'}
+        <div class="collection-rest" aria-hidden="true"></div>
+      </div>`;
+  }).join("");
+
+  els.collectionGrid.querySelectorAll("[data-track-id]").forEach((button) => {
+    button.addEventListener("click", () => {
+      const track = tracks.find((item) => item.id === button.dataset.trackId);
+      if (!track) return;
+      if (state.isPlaying) pausePlayback();
+      state.summaryTrack = track;
+      renderDailyCollection();
+    });
+  });
+
+  const moodSlots = Array.isArray(state.mood?.slots)
+    ? state.mood.slots.slice(0, 5)
+    : state.mood?.label
+      ? [state.mood.label]
+      : [];
+  if (els.collectionMoods) {
+    els.collectionMoods.innerHTML = moodSlots.map((label) => `
+      <span class="collection-mood" title="${MOODS.find((m) => m.label === label)?.text || label}">
+        <span style="background:${moodColor(label)}"><img src="${twemojiUrl(label)}" alt="" /></span>
+      </span>`).join("");
+  }
+
+  updateSummaryPlayer();
+}
+
+function updateSummaryPlayer() {
+  if (!els.summaryDisc || !els.collectionPlayer) return;
+  const track = state.summaryTrack;
+  const isActive = !!track && state.currentTrack?.id === track.id;
+  els.collectionPlayer.classList.toggle("has-track", !!track);
+  els.collectionPlayer.classList.toggle("is-playing", isActive && state.isPlaying);
+  els.summaryDisc.classList.toggle("spinning", isActive && state.isPlaying);
+
+  if (!track) {
+    els.summaryDiscLabel.style.backgroundImage = "";
+    els.summaryDiscLabel.style.background = "linear-gradient(145deg,#8f653f,#30231a)";
+    els.summaryTrackTitle.textContent = "Select a record";
+    els.summaryTrackArtist.textContent = "Click a record on the shelf to mount it";
+    return;
+  }
+
+  els.summaryTrackTitle.textContent = track.title;
+  els.summaryTrackArtist.textContent = `${track.artist}${isActive ? "" : " · Mounted — tap to play"}`;
+  if (track.coverUrl) {
+    els.summaryDiscLabel.style.background = "";
+    els.summaryDiscLabel.style.backgroundImage = `url('${track.coverUrl}')`;
+  } else {
+    els.summaryDiscLabel.style.backgroundImage = "";
+    els.summaryDiscLabel.style.background = `linear-gradient(145deg,${track.color || "#d4843a"},#30231a)`;
+  }
+  if (isActive && !state.isPlaying) {
+    const duration = trackDurationMs(track);
+    els.summaryDisc.style.transform = duration
+      ? `rotate(${(state.positionMs / duration) * 360}deg)`
+      : "";
+  } else if (!isActive) {
+    els.summaryDisc.style.transform = "rotate(0deg)";
+  } else {
+    els.summaryDisc.style.transform = "";
+  }
+}
+
+function toggleSummaryPlayback() {
+  const track = state.summaryTrack;
+  if (!track) return;
+  if (state.currentTrack?.id !== track.id) {
+    playTrack(track, { appendHistory: true, recordSelection: false });
+  } else if (state.isPlaying) {
+    pausePlayback();
+  } else {
+    startPlayback();
+  }
+}
+
+function setupSummaryPlayerGestures() {
+  const player = els.collectionPlayer;
+  if (!player || player.dataset.bound === "1") return;
+  player.dataset.bound = "1";
+  let active = false;
+  let rotating = false;
+  let startX = 0;
+  let startY = 0;
+  let startAngle = 0;
+  let startPosition = 0;
+
+  const angleAt = (x, y) => {
+    const rect = els.summaryDisc.getBoundingClientRect();
+    return Math.atan2(y - (rect.top + rect.height / 2), x - (rect.left + rect.width / 2));
+  };
+
+  player.addEventListener("pointerdown", (event) => {
+    if (!state.summaryTrack) return;
+    active = true;
+    rotating = false;
+    startX = event.clientX;
+    startY = event.clientY;
+    startAngle = angleAt(event.clientX, event.clientY);
+    startPosition = state.positionMs;
+    player.setPointerCapture?.(event.pointerId);
+  });
+
+  player.addEventListener("pointermove", (event) => {
+    if (!active || state.currentTrack?.id !== state.summaryTrack?.id) return;
+    if (Math.hypot(event.clientX - startX, event.clientY - startY) > 8) rotating = true;
+    if (!rotating) return;
+    const delta = angleAt(event.clientX, event.clientY) - startAngle;
+    const normalized = Math.atan2(Math.sin(delta), Math.cos(delta));
+    seek(startPosition + (normalized / (Math.PI * 2)) * trackDurationMs(state.summaryTrack));
+  });
+
+  player.addEventListener("pointerup", () => {
+    if (!active) return;
+    active = false;
+    if (!rotating) toggleSummaryPlayback();
+  });
+  player.addEventListener("pointercancel", () => {
+    active = false;
+    rotating = false;
+  });
+  player.addEventListener("keydown", (event) => {
+    if (event.key === "Enter" || event.key === " ") {
+      event.preventDefault();
+      toggleSummaryPlayback();
+    }
+  });
+}
+
+// ─── Legacy weekly report helpers (kept for share-card compatibility) ──
 function getTop5() {
   const counts = {};
   for (const p of state.validPlays) {
@@ -1335,18 +1540,16 @@ function bindEvents() {
     goToMoodScreen();
   });
 
-  els.btnMoodSkip?.addEventListener("click", () => skipMood());
   els.btnMoodContinue?.addEventListener("click", () => {
-    showScreen("report");
+    showScreen("summary");
   });
-
-  els.btnShare.addEventListener("click", generateShareImage);
 
   $$("[data-go]").forEach((btn) => {
     btn.addEventListener("click", () => showScreen(btn.dataset.go));
   });
 
   setupVinylGestures();
+  setupSummaryPlayerGestures();
 
   document.addEventListener("visibilitychange", () => {
     if (document.hidden && state.isPlaying) pausePlayback();

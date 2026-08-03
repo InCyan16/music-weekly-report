@@ -39,10 +39,23 @@ export const sessionQualifySchema = sessionProgressSchema.extend({
   reachedEnd: z.boolean().optional(),
 });
 
-export const moodSchema = z.object({
-  moodScore: z.number().int().min(1).max(5),
-  moodLabel: z.enum(["loved", "happy", "calm", "tired", "sad"]),
-});
+export const moodLabelSchema = z.enum([
+  "loved",
+  "happy",
+  "calm",
+  "tired",
+  "sad",
+]);
+
+export const moodSchema = z.union([
+  z.object({
+    moodSlots: z.array(moodLabelSchema).min(1).max(5),
+  }),
+  z.object({
+    moodScore: z.number().int().min(1).max(5),
+    moodLabel: moodLabelSchema,
+  }),
+]);
 
 export type TrackInput = z.infer<typeof trackSchema>;
 

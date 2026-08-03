@@ -248,7 +248,8 @@
 | `/login` | 登录 | Magic Link、Google 登录 |
 | `/connect-music` | 连接音乐账户 | Spotify 授权、连接状态、Premium 提示 |
 | `/today` | 今日音乐 | 搜索、黑胶播放器、播放历史、「结束今天的聆听」 |
-| `/today/mood` | 心情选择 | 五档心情表情 |
+| `/today/mood` | 心情选择 | 拖入 1–5 张心情唱片并关上音乐盒 |
+| `/today/summary` | 每日收藏 | 当天前八首点播唱片、心情组合与小唱机试听 |
 | `/week` | 本周进度 | 听音天数、播放次数、心情天数；**不显示 Top 5** |
 | `/report/[weekId]` | 周报 | Top 5、动态唱片、心情统计、分享图 |
 | `/reports` | 历史报告 | 已生成的历史周报列表 |

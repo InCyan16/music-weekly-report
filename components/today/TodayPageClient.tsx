@@ -168,12 +168,6 @@ export function TodayPageClient() {
           >
             结束今天的聆听
           </button>
-          <button
-            onClick={() => router.push("/today/mood")}
-            className="rounded-full border border-[#da8f4f]/45 bg-[#b86f35]/20 px-5 py-2 text-sm font-medium text-white shadow-[inset_0_1px_0_rgba(255,220,184,0.12),0_10px_28px_rgba(0,0,0,0.18)] backdrop-blur-xl transition-colors hover:bg-[#b86f35]/30"
-          >
-            心情 · 临时
-          </button>
         </div>
         {todayValidPlayCount > 0 && (
           <p className="mt-1 text-xs text-ink-muted">

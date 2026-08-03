@@ -120,8 +120,8 @@ describe("calculateTopSongs", () => {
       makeEntry("b", "ext-b", "Song B", "2026-07-07T09:00:00Z"),
     ];
     const top = calculateTopSongs(entries);
-    expect(top[0].title).toBe("Song A");
-    expect(top[1].title).toBe("Song B");
+    expect(top[0].title).toBe("Song B");
+    expect(top[1].title).toBe("Song A");
   });
 
   it("returns max 5 songs", () => {

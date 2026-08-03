@@ -262,6 +262,8 @@ export const usePlayerStore = create<PlayerStore>((set, get) => ({
       unsub();
       cleanupTab();
       finalizeSession(get, "page_closed");
+      if (get().progressTimer) clearInterval(get().progressTimer!);
+      set({ initialized: false, progressTimer: null });
     };
   },
 
